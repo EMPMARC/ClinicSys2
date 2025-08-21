@@ -1,7 +1,6 @@
 import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
-
 const EightDigitDateInput = ({ label, name, value, onChange }) => {
   const handleChange = (e, index) => {
     const newValue = value.split('');
@@ -78,6 +77,7 @@ function OnboardingPage() {
 
   const signatureRef = useRef(null);
   const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -139,10 +139,52 @@ function OnboardingPage() {
     signatureRef.current.isDrawing = false;
   };
 
-  const handleSubmit = (e) => {
+  // Function to get signature as base64
+  const getSignatureData = () => {
+    if (!signatureRef.current) return null;
+    return signatureRef.current.toDataURL();
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Form submitted", formData);
-    navigate("/upload-proof");
+    setIsSubmitting(true);
+    
+    try {
+      // Get signature data
+      const signatureData = getSignatureData();
+      
+      // Prepare data to send
+      const dataToSend = {
+        ...formData,
+        signatureData
+      };
+      
+      console.log("Sending data:", dataToSend);
+      
+      // Send data to backend
+      const response = await fetch('http://localhost:5001/api/onboarding', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(dataToSend),
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        console.log("Form submitted successfully!", result);
+        navigate("/upload-proof");
+      } else {
+        console.error("Failed to submit form:", result.error);
+        alert(`Error: ${result.error}\nDetails: ${result.details || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error("Error submitting form:", error);
+      alert("Failed to submit form. Please check your connection and try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const renderRadio = (name, options) =>
@@ -362,20 +404,21 @@ function OnboardingPage() {
         </button>
         <button
           type="submit"
+          disabled={isSubmitting}
           style={{
-            backgroundColor: "#007bff",
+            backgroundColor: isSubmitting ? "#6c757d" : "#007bff",
             color: "white",
             border: "none",
             padding: "8px 16px",
-            cursor: "pointer",
+            cursor: isSubmitting ? "not-allowed" : "pointer",
             borderRadius: "4px",
           }}
         >
-          Submit and Continue
+          {isSubmitting ? "Submitting..." : "Submit and Continue"}
         </button>
       </form>
     </div>
   );
 }
 
-export default OnboardingPage;
+export default OnboardingPage;
