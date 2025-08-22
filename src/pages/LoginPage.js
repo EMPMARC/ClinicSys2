@@ -3,47 +3,49 @@ import './LoginPage.css';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/logo.png';
 
-// ------------ Mock users (temporary) -------------
-const mockUsers = [
-  { id: 'p1', username: 'patient1', password: '1234', role: 'patient', name: 'Student One' },
-  { id: 'p2', username: 'student2', password: 'pass', role: 'patient', name: 'Student Two' },
-  { id: 'a1', username: 'admin1', password: 'abcd', role: 'admin', name: 'Admin' },
-  { id: 'r2', username: 'reception1', password: 'g1356', role: 'receptionist', name: 'Reception' },
-  { id: 'n1', username: 'nurse1', password: 'n1234', role: 'nurse', name: 'Nurse Alice' }, // Nurse account
-];
-// -------------------------------------------------
-
 const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
 
-    // 1) find user in mock list
-    const foundUser = mockUsers.find(
-      (u) => u.username === username.trim() && u.password === password
-    );
+    try {
+      const response = await fetch('http://localhost:5001/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
 
-    // 2) if not found, show error
-    if (!foundUser) {
-      setError('Invalid username or password. Try one of the sample accounts below.');
-      return;
-    }
+      const data = await response.json();
 
-    // 3) save user (temporary) and redirect depending on role
-    localStorage.setItem('user', JSON.stringify(foundUser));
-    localStorage.setItem('role', foundUser.role);
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed');
+      }
 
-    if (foundUser.role === 'nurse') {
-      navigate('/nurse-dashboard');   // ✅ redirect nurses to Nurse Dashboard
-    } else if (foundUser.role === 'admin' || foundUser.role === 'receptionist') {
-      navigate('/admin-dashboard');   // admin + reception
-    } else {
-      navigate('/patient-dashboard'); // patients
+      // Save user data to localStorage
+      localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('role', data.user.role_name);
+
+      // Redirect based on role
+      if (data.user.role_name === 'nurse') {
+        navigate('/nurse-dashboard');
+      } else if (data.user.role_name === 'admin' || data.user.role_name === 'receptionist') {
+        navigate('/admin-dashboard');
+      } else {
+        navigate('/patient-dashboard');
+      }
+    } catch (err) {
+      setError(err.message || 'Invalid username or password. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -77,23 +79,25 @@ const LoginPage = () => {
 
         {error && <p className="login-error">{error}</p>}
 
-        <button type="submit" className="login-button">LOGIN</button>
+        <button 
+          type="submit" 
+          className="login-button"
+          disabled={isLoading}
+        >
+          {isLoading ? 'LOGGING IN...' : 'LOGIN'}
+        </button>
       </form>
 
       <button className="forgot-password">Forgot Password?</button>
 
       <div style={{ marginTop: 18, fontSize: 13, color: '#444' }}>
-        <strong>Sample accounts (for testing):</strong>
+        <strong>Select forgot password to reset your login details:</strong>
         <ul style={{ marginTop: 6 }}>
-          <li>Patient: <code>patient1 / 1234</code></li>
-          <li>Patient: <code>student2 / pass</code></li>
-          <li>Admin: <code>admin1 / abcd</code></li>
-          <li>Reception: <code>reception1 / g1356</code></li>
-          <li>Nurse: <code>nurse1 / n1234</code></li>
+
         </ul>
       </div>
     </div>
   );
 };
 
-export default LoginPage;
+export default LoginPage;

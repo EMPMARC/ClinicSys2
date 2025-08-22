@@ -2,6 +2,7 @@ const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const bcrypt = require('bcrypt');
 const app = express();
 const PORT = 5001;
 
@@ -11,10 +12,10 @@ app.use(bodyParser.json());
 
 // MySQL Connection
 const db = mysql.createConnection({
-  host: 'localhost',      // Replace if using a remote DB
-  user: 'root',           // Your MySQL username
-  password: 'CHWC2025Project', // Your MySQL password
-  database: 'chwc' // Your database name
+  host: 'localhost',
+  user: 'root',
+  password: 'CHWC2025Project',
+  database: 'chwc'
 });
 
 // Connect to MySQL
@@ -29,6 +30,133 @@ db.connect((err) => {
 // Test route
 app.get('/', (req, res) => {
   res.send('Backend is working!');
+});
+
+// Login endpoint - FIXED to include staff_number search
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body;
+  
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required' });
+  }
+
+  // Query to find user by username, email, OR staff_number
+  const sql = `
+    SELECT u.*, r.role_name 
+    FROM users u 
+    JOIN roles r ON u.role_id = r.id 
+    WHERE u.username = ? OR u.email = ? OR u.staff_number = ?
+  `;
+  
+  db.query(sql, [username, username, username], async (err, results) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    if (results.length === 0) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+    
+    const user = results[0];
+    
+    // Compare password with hashed password in database
+    try {
+      const isMatch = await bcrypt.compare(password, user.password);
+      
+      if (!isMatch) {
+        return res.status(401).json({ error: 'Invalid username or password' });
+      }
+      
+      // Remove password from response
+      const { password: _, ...userWithoutPassword } = user;
+      
+      res.status(200).json({
+        message: 'Login successful',
+        user: userWithoutPassword
+      });
+    } catch (error) {
+      console.error('Error comparing passwords:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+});
+
+// Password reset endpoint (for development)
+app.post('/api/reset-passwords', async (req, res) => {
+  try {
+    // Hash the common password
+    const hashedPassword = await bcrypt.hash('password123', 10);
+    
+    // Update all users with the new hashed password
+    const sql = 'UPDATE users SET password = ?';
+    db.query(sql, [hashedPassword], (err, result) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Failed to reset passwords' });
+      }
+      res.status(200).json({ 
+        message: 'Passwords reset successfully!',
+        newPassword: 'password123',
+        usersAffected: result.affectedRows
+      });
+    });
+  } catch (error) {
+    console.error('Error hashing password:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Debug endpoint to check user data
+app.post('/api/debug-user', (req, res) => {
+  const { username } = req.body;
+  
+  if (!username) {
+    return res.status(400).json({ error: 'Username is required' });
+  }
+
+  const sql = `
+    SELECT u.*, r.role_name 
+    FROM users u 
+    JOIN roles r ON u.role_id = r.id 
+    WHERE u.username = ? OR u.email = ? OR u.staff_number = ?
+  `;
+  
+  db.query(sql, [username, username, username], (err, results) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    res.status(200).json({ 
+      userFound: results.length > 0,
+      users: results,
+      count: results.length
+    });
+  });
+});
+
+// Get all users endpoint (for debugging)
+app.get('/api/users', (req, res) => {
+  const sql = `
+    SELECT u.id, u.username, u.email, u.staff_number, u.full_name, 
+           r.role_name, u.is_active, u.created_at
+    FROM users u 
+    JOIN roles r ON u.role_id = r.id 
+    ORDER BY u.id
+  `;
+  
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    res.status(200).json({ 
+      users: results,
+      count: results.length
+    });
+  });
 });
 
 // API Endpoint: Save onboarding data
@@ -105,4 +233,10 @@ app.use((err, req, res, next) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`Backend running on http://localhost:${PORT}`);
+  console.log(`Available endpoints:`);
+  console.log(`- POST /api/login`);
+  console.log(`- POST /api/reset-passwords (for development)`);
+  console.log(`- POST /api/debug-user`);
+  console.log(`- GET /api/users`);
+  console.log(`- POST /api/onboarding`);
 });
