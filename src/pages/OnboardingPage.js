@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 const EightDigitDateInput = ({ label, name, value, onChange }) => {
@@ -78,6 +78,48 @@ function OnboardingPage() {
   const signatureRef = useRef(null);
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [alreadyOnboarded, setAlreadyOnboarded] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
+
+  // Add useEffect to set the student number from localStorage and check if already onboarded
+  useEffect(() => {
+    const staffNumber = localStorage.getItem('staffNumber');
+    if (staffNumber) {
+      setFormData(prev => ({
+        ...prev,
+        studentNumber: staffNumber
+      }));
+      
+      // Check if student is already onboarded
+      checkIfOnboarded(staffNumber);
+    } else {
+      setIsChecking(false);
+    }
+  }, []);
+
+  const checkIfOnboarded = async (studentNumber) => {
+    try {
+      const response = await fetch('http://localhost:5001/api/check-onboarding', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ studentNumber }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setAlreadyOnboarded(data.exists);
+      } else {
+        console.error("Failed to check onboarding status:", data.error);
+      }
+    } catch (error) {
+      console.error("Error checking onboarding status:", error);
+    } finally {
+      setIsChecking(false);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -202,6 +244,37 @@ function OnboardingPage() {
       </label>
     ));
 
+  if (isChecking) {
+    return (
+      <div style={{ padding: "30px", fontFamily: "Arial", textAlign: "center" }}>
+        <h2>Checking your onboarding status...</h2>
+      </div>
+    );
+  }
+
+  if (alreadyOnboarded) {
+    return (
+      <div style={{ padding: "30px", fontFamily: "Arial", textAlign: "center" }}>
+        <h2>You have already completed the onboarding process.</h2>
+        <p>Your information is already in our system.</p>
+        <button 
+          onClick={() => navigate("/patient-dashboard")}
+          style={{
+            backgroundColor: "#007bff",
+            color: "white",
+            border: "none",
+            padding: "10px 20px",
+            cursor: "pointer",
+            borderRadius: "4px",
+            marginTop: "20px"
+          }}
+        >
+          Return to Dashboard
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div style={{ padding: "30px", fontFamily: "Arial" }}>
       <h1 style={{ textAlign: "center" }}>Campus Health & Wellness Centre</h1>
@@ -216,7 +289,14 @@ function OnboardingPage() {
 
         <div>
           <label>Student Number:</label>
-          <input name="studentNumber" value={formData.studentNumber} onChange={handleChange} required />
+          <input 
+            name="studentNumber" 
+            value={formData.studentNumber} 
+            onChange={handleChange} 
+            required 
+            readOnly 
+            style={{ backgroundColor: '#f0f0f0' }}
+          />
         </div>
         <div>
           <label>Surname:</label>

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import logo from '../assets/logo.png';
 
 const LoginPage = () => {
-  const [username, setUsername] = useState('');
+  const [staffNumber, setStaffNumber] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -21,7 +21,7 @@ const LoginPage = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ staffNumber, password }),
       });
 
       const data = await response.json();
@@ -33,9 +33,36 @@ const LoginPage = () => {
       // Save user data to localStorage
       localStorage.setItem('user', JSON.stringify(data.user));
       localStorage.setItem('role', data.user.role_name);
+      localStorage.setItem('staffNumber', staffNumber); // Store staff/student number
 
-      // Redirect based on role
-      if (data.user.role_name === 'nurse') {
+      // For patients, check if they've completed onboarding
+      if (data.user.role_name === 'patient') {
+        try {
+          const onboardingCheck = await fetch('http://localhost:5001/api/check-onboarding', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ studentNumber: staffNumber }),
+          });
+          
+          const onboardingData = await onboardingCheck.json();
+          
+          if (onboardingCheck.ok && onboardingData.exists) {
+            // Patient has completed onboarding, go to dashboard
+            navigate('/patient-dashboard');
+          } else {
+            // Patient needs to complete onboarding
+            navigate('/onboarding');
+          }
+        } catch (err) {
+          console.error('Error checking onboarding status:', err);
+          // If there's an error checking, send to onboarding to be safe
+          navigate('/onboarding');
+        }
+      } 
+      // Redirect based on role for non-patients
+      else if (data.user.role_name === 'nurse') {
         navigate('/nurse-dashboard');
       } else if (data.user.role_name === 'admin' || data.user.role_name === 'receptionist') {
         navigate('/admin-dashboard');
@@ -43,7 +70,7 @@ const LoginPage = () => {
         navigate('/patient-dashboard');
       }
     } catch (err) {
-      setError(err.message || 'Invalid username or password. Please try again.');
+      setError(err.message || 'Invalid student/staff number or password. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -55,14 +82,14 @@ const LoginPage = () => {
       <img src={logo} alt="Campus Health and Wellness Centre" className="login-logo" />
 
       <form onSubmit={handleLogin}>
-        <label className="login-label" htmlFor="username">Username</label>
+        <label className="login-label" htmlFor="staff/studentNumber">Student/Staff Number</label>
         <input
           type="text"
-          id="username"
-          placeholder="Staff number or email"
+          id="staff/studentNumber"
+          placeholder="Enter your student/staff number"
           className="login-input"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          value={staffNumber}
+          onChange={(e) => setStaffNumber(e.target.value)}
           required
         />
 
