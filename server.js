@@ -12,8 +12,8 @@ app.use(bodyParser.json());
 
 // MySQL Connection
 const db = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
+  host: 'chwc-database.choewaaukon8.eu-west-2.rds.amazonaws.com',
+  user: 'admin',
   password: 'CHWC2025Project',
   database: 'chwc'
 });

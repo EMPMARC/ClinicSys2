@@ -55,5 +55,6 @@
   "bugs": {
     "url": "https://github.com/TshiamoMokgethwa/chwc-system/issues"
   },
-  "homepage": "."
+  "homepage": "http://.",
+  "devDependencies": {}
 }
