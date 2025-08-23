@@ -196,6 +196,112 @@ app.post('/api/upload-por', (req, res) => {
   });
 });
 
+// Save appointment to database
+app.post('/api/save-appointment', (req, res) => {
+  const {
+    referenceNumber,
+    userId,
+    staffNumber,
+    appointmentType,
+    appointmentFor,
+    appointmentDate,
+    appointmentTime,
+    previousAppointmentRef
+  } = req.body;
+
+  if (!referenceNumber || !userId || !staffNumber || !appointmentType || !appointmentFor || !appointmentTime) {
+    return res.status(400).json({ 
+      error: 'Missing required fields' 
+    });
+  }
+
+  const sql = `
+    INSERT INTO appointments (
+      reference_number, user_id, staff_number, appointment_type, 
+      appointment_for, appointment_date, appointment_time, previous_appointment_ref
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+
+  const values = [
+    referenceNumber,
+    userId,
+    staffNumber,
+    appointmentType,
+    appointmentFor,
+    appointmentDate || null,
+    appointmentTime,
+    previousAppointmentRef || null
+  ];
+
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error('Database error saving appointment:', err);
+      return res.status(500).json({ 
+        error: 'Failed to save appointment',
+        details: err.message 
+      });
+    }
+    
+    res.status(200).json({ 
+      message: 'Appointment saved successfully!', 
+      appointmentId: result.insertId 
+    });
+  });
+});
+
+// Get user appointments
+app.get('/api/user-appointments/:staffNumber', (req, res) => {
+  const { staffNumber } = req.params;
+
+  const sql = `
+    SELECT a.*, u.full_name 
+    FROM appointments a
+    JOIN users u ON a.user_id = u.id
+    WHERE a.staff_number = ?
+    ORDER BY a.created_at DESC
+  `;
+
+  db.query(sql, [staffNumber], (err, results) => {
+    if (err) {
+      console.error('Database error fetching appointments:', err);
+      return res.status(500).json({ 
+        error: 'Failed to fetch appointments',
+        details: err.message 
+      });
+    }
+    
+    res.status(200).json({ 
+      appointments: results,
+      count: results.length
+    });
+  });
+});
+
+// Get all appointments (for admin/nurse view)
+app.get('/api/appointments', (req, res) => {
+  const sql = `
+    SELECT a.*, u.full_name 
+    FROM appointments a
+    JOIN users u ON a.user_id = u.id
+    ORDER BY a.appointment_date DESC, a.appointment_time DESC
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error('Database error fetching all appointments:', err);
+      return res.status(500).json({ 
+        error: 'Failed to fetch appointments',
+        details: err.message 
+      });
+    }
+    
+    res.status(200).json({ 
+      appointments: results,
+      count: results.length
+    });
+  });
+});
+
 // Password reset endpoint (for development)
 app.post('/api/reset-passwords', async (req, res) => {
   try {
@@ -321,6 +427,42 @@ app.post('/api/create-por-table', (req, res) => {
   });
 });
 
+// Create appointments table if it doesn't exist (for development)
+app.post('/api/create-appointments-table', (req, res) => {
+  const createTableSql = `
+    CREATE TABLE IF NOT EXISTS appointments (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      reference_number VARCHAR(50) NOT NULL UNIQUE,
+      user_id INT NOT NULL,
+      staff_number VARCHAR(50) NOT NULL,
+      appointment_type VARCHAR(100) NOT NULL,
+      appointment_for VARCHAR(100) NOT NULL,
+      appointment_date DATE,
+      appointment_time TIME NOT NULL,
+      previous_appointment_ref VARCHAR(50),
+      status ENUM('scheduled', 'completed', 'cancelled') DEFAULT 'scheduled',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `;
+  
+  db.query(createTableSql, (err, result) => {
+    if (err) {
+      console.error('Error creating appointments table:', err);
+      return res.status(500).json({ 
+        error: 'Failed to create appointments table',
+        details: err.message 
+      });
+    }
+    
+    res.status(200).json({ 
+      message: 'Appointments table created successfully or already exists',
+      result: result
+    });
+  });
+});
+
 // API Endpoint: Save onboarding data
 app.post('/api/onboarding', (req, res) => {
   const formData = req.body;
@@ -418,10 +560,14 @@ app.listen(PORT, () => {
   console.log(`- POST /api/login`);
   console.log(`- POST /api/check-onboarding`);
   console.log(`- POST /api/upload-por`);
+  console.log(`- POST /api/save-appointment`);
+  console.log(`- GET /api/user-appointments/:staffNumber`);
+  console.log(`- GET /api/appointments`);
   console.log(`- POST /api/reset-passwords (for development)`);
   console.log(`- POST /api/debug-user`);
   console.log(`- GET /api/users`);
   console.log(`- GET /api/por-uploads`);
   console.log(`- POST /api/create-por-table (for development)`);
+  console.log(`- POST /api/create-appointments-table (for development)`);
   console.log(`- POST /api/onboarding`);
 });

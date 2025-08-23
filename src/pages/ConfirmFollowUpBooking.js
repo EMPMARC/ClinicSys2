@@ -4,7 +4,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 function ConfirmFollowUpPage() {
   const location = useLocation();
   const navigate = useNavigate();
-
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const staffNumber = localStorage.getItem('staffNumber');
 
   const {
     previousAppointment,
@@ -13,8 +14,38 @@ function ConfirmFollowUpPage() {
     appointmentTime: time
   } = location.state || {};
 
-  const handleSubmit = () => {
-    navigate("/submitted");
+  const handleSubmit = async () => {
+    try {
+      const reference = 'CHWCS' + Math.floor(Math.random() * 1000000000);
+      
+      const response = await fetch('http://localhost:5001/api/save-appointment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          referenceNumber: reference,
+          userId: user.id,
+          staffNumber: staffNumber,
+          appointmentType: "Follow-Up Booking",
+          appointmentFor: followUpFor,
+          appointmentDate: date,
+          appointmentTime: time,
+          previousAppointmentRef: previousAppointment
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to save appointment');
+      }
+
+      navigate("/submitted");
+    } catch (error) {
+      console.error('Error saving appointment:', error);
+      alert('Failed to save appointment. Please try again.');
+    }
   };
 
   const handleBack = () => {

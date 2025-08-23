@@ -5,9 +5,39 @@ const ConfirmBooking = () => {
   const { state } = useLocation();
   const navigate = useNavigate();
   const reference = 'CHWCS' + Math.floor(Math.random() * 1000000000);
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const staffNumber = localStorage.getItem('staffNumber');
 
-  const handleSubmit = () => {
-    navigate('/submitted');
+  const handleSubmit = async () => {
+    try {
+      const response = await fetch('http://localhost:5001/api/save-appointment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          referenceNumber: reference,
+          userId: user.id,
+          staffNumber: staffNumber,
+          appointmentType: "Health and Wellness Booking",
+          appointmentFor: state.service,
+          appointmentDate: state.date,
+          appointmentTime: state.time,
+          previousAppointmentRef: null
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to save appointment');
+      }
+
+      navigate('/submitted');
+    } catch (error) {
+      console.error('Error saving appointment:', error);
+      alert('Failed to save appointment. Please try again.');
+    }
   };
 
   return (
@@ -24,9 +54,9 @@ const ConfirmBooking = () => {
       <div className="bg-blue-100 p-2 rounded mb-3">
         Main Campus Health and Wellness Centre
       </div>
-      <p><strong>Appointment for:</strong> {state.appointmentType}</p>
-      {state.appointmentDate && <p><strong>Appointment Date:</strong> {state.appointmentDate}</p>}
-      <p><strong>Appointment Time:</strong> {state.appointmentTime}</p>
+      <p><strong>Appointment for:</strong> {state.service}</p>
+      {state.date && <p><strong>Appointment Date:</strong> {state.date}</p>}
+      <p><strong>Appointment Time:</strong> {state.time}</p>
 
       <div className="flex justify-between mt-4">
         <button className="bg-gray-400 text-white px-4 py-2 rounded" onClick={() => navigate(-1)}>&lt;&lt; Back</button>
@@ -38,4 +68,4 @@ const ConfirmBooking = () => {
   );
 };
 
-export default ConfirmBooking;
+export default ConfirmBooking;
