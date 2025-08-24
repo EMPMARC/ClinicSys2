@@ -24,6 +24,7 @@ import StaffSchedulePage from "./pages/staff/StaffSchedulePage";
 import EmergencyOnboardingPage from "./pages/staff/EmergencyOnboardingPage";
 import ModifyBookingPage from "./pages/staff/ModifyBookingPage";
 import ApproveProofPage from "./pages/staff/ApproveProofPage";
+import TodaysSchedule from "./pages/staff/TodaysSchedule";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -182,8 +183,16 @@ function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/today-schedule"
+        element={
+          <ProtectedRoute requiredRole="admin">
+            <TodaysSchedule />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 }
 
-export default App;
+export default App;
