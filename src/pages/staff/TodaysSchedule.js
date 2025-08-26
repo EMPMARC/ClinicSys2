@@ -117,18 +117,18 @@ export default function TodaysSchedule() {
         <button 
           onClick={fetchTodaysSchedule}
           style={{
-            padding: "12px 24px",
-            background: "#007bff",
-            color: "white",
-            border: "none",
-            cursor: "pointer",
-            borderRadius: "6px",
-            fontSize: "16px",
-            fontWeight: "bold",
-          }}
-        >
-          🔄 Refresh Schedule
-        </button>
+          padding: "12px 24px",
+          background: "#007bff",
+          color: "white",
+          border: "none",
+          cursor: "pointer",
+          borderRadius: "6px",
+          fontSize: "16px",
+          fontWeight: "bold",
+  }}
+>
+  Refresh Schedule
+</button>
       </div>
 
       <div style={{ 

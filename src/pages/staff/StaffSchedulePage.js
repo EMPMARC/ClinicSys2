@@ -18,23 +18,6 @@ const staffList = [
   "Ms. Nomangezi Ziqubu",
 ];
 
-// Generate time options from 7:00 AM to 5:45 PM in 15-minute intervals
-const generateTimeOptions = () => {
-  const options = [];
-  for (let hour = 7; hour <= 17; hour++) {
-    for (let minute = 0; minute < 60; minute += 15) {
-      const time24h = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`;
-      const displayHour = hour % 12 || 12;
-      const ampm = hour >= 12 ? 'PM' : 'AM';
-      const displayTime = `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`;
-      options.push({ value: time24h, label: displayTime });
-    }
-  }
-  return options;
-};
-
-const timeOptions = generateTimeOptions();
-
 export default function StaffSchedulePage() {
   const [month, setMonth] = useState(new Date().toLocaleString('default', { month: 'long' }));
   const [day, setDay] = useState(new Date().getDate());
@@ -89,12 +72,6 @@ export default function StaffSchedulePage() {
 
   const handleReviewSchedule = () => {
     navigate("/today-schedule");
-  };
-
-  // Filter end time options to be after start time
-  const getFilteredEndTimes = (startTime) => {
-    if (!startTime) return timeOptions;
-    return timeOptions.filter(option => option.value > startTime);
   };
 
   return (
@@ -156,68 +133,46 @@ export default function StaffSchedulePage() {
                 
                 {/* Lunch 1 Start */}
                 <td style={{ padding: "10px" }}>
-                  <select
+                  <input
+                    type="text"
                     value={staff.lunch1_start}
                     onChange={(e) => handleTimeChange(index, "lunch1_start", e.target.value)}
+                    placeholder="HH:MM AM/PM"
                     style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ccc" }}
-                  >
-                    <option value="">-- Select --</option>
-                    {timeOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </td>
                 
                 {/* Lunch 1 End */}
                 <td style={{ padding: "10px" }}>
-                  <select
+                  <input
+                    type="text"
                     value={staff.lunch1_end}
                     onChange={(e) => handleTimeChange(index, "lunch1_end", e.target.value)}
+                    placeholder="HH:MM AM/PM"
                     style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ccc" }}
-                    disabled={!staff.lunch1_start}
-                  >
-                    <option value="">-- Select --</option>
-                    {getFilteredEndTimes(staff.lunch1_start).map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </td>
                 
                 {/* Lunch 2 Start */}
                 <td style={{ padding: "10px" }}>
-                  <select
+                  <input
+                    type="text"
                     value={staff.lunch2_start}
                     onChange={(e) => handleTimeChange(index, "lunch2_start", e.target.value)}
+                    placeholder="HH:MM AM/PM"
                     style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ccc" }}
-                  >
-                    <option value="">-- Select --</option>
-                    {timeOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </td>
                 
                 {/* Lunch 2 End */}
                 <td style={{ padding: "10px" }}>
-                  <select
+                  <input
+                    type="text"
                     value={staff.lunch2_end}
                     onChange={(e) => handleTimeChange(index, "lunch2_end", e.target.value)}
+                    placeholder="HH:MM AM/PM"
                     style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ccc" }}
-                    disabled={!staff.lunch2_start}
-                  >
-                    <option value="">-- Select --</option>
-                    {getFilteredEndTimes(staff.lunch2_start).map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </td>
                 
                 <td style={{ padding: "10px" }}>
@@ -249,7 +204,7 @@ export default function StaffSchedulePage() {
             fontWeight: "bold",
           }}
         >
-          💾 Save Schedule
+          Save Schedule
         </button>
         
         <button
@@ -265,7 +220,7 @@ export default function StaffSchedulePage() {
             fontWeight: "bold",
           }}
         >
-          📋 Review Today's Schedule
+          Review Today's Schedule
         </button>
       </div>
     </div>

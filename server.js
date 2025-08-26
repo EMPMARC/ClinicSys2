@@ -556,7 +556,7 @@ app.post('/api/save-staff-schedule', (req, res) => {
   }
 
   const sql = `
-    INSERT INTO staff_schedule (staff_name, month, day, lunch1_start, lunch1_end, lunch2_start, lunch2_end, notes) 
+    INSERT INTO staff_lunch_schedule (staff_name, month, day, lunch1_start, lunch1_end, lunch2_start, lunch2_end, notes) 
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE 
       lunch1_start = VALUES(lunch1_start), 
@@ -604,7 +604,7 @@ app.get('/api/today-staff-schedule', (req, res) => {
         IF(lunch1_start IS NOT NULL AND lunch2_start IS NOT NULL, ' / ', ''),
         IFNULL(CONCAT(TIME_FORMAT(lunch2_start, '%h:%i %p'), ' - ', TIME_FORMAT(lunch2_end, '%h:%i %p')), '')
       ) as lunch_times
-    FROM staff_schedule 
+    FROM staff_lunch_schedule 
     WHERE month = ? AND day = ?
     ORDER BY staff_name
   `;
@@ -629,7 +629,7 @@ app.get('/api/today-staff-schedule', (req, res) => {
 // Create staff_schedule table if it doesn't exist (UPDATED for time picker)
 app.post('/api/create-staff-schedule-table', (req, res) => {
   const createTableSql = `
-    CREATE TABLE IF NOT EXISTS staff_schedule (
+    CREATE TABLE IF NOT EXISTS staff_lunch_schedule (
       id INT AUTO_INCREMENT PRIMARY KEY,
       staff_name VARCHAR(255) NOT NULL,
       month VARCHAR(20) NOT NULL,
@@ -661,6 +661,190 @@ app.post('/api/create-staff-schedule-table', (req, res) => {
   });
 });
 
+// Create emergency_onboarding table if it doesn't exist
+app.post('/api/create-emergency-table', (req, res) => {
+  const createTableSql = `
+    CREATE TABLE IF NOT EXISTS emergency_onboarding (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      date DATE NOT NULL,
+      time_of_call TIME NOT NULL,
+      person_responsible VARCHAR(255) NOT NULL,
+      caller_name VARCHAR(255) NOT NULL,
+      department VARCHAR(255) NOT NULL,
+      contact_number VARCHAR(20) NOT NULL,
+      problem_nature TEXT NOT NULL,
+      
+      east_campus BOOLEAN DEFAULT FALSE,
+      west_campus BOOLEAN DEFAULT FALSE,
+      education_campus BOOLEAN DEFAULT FALSE,
+      other_campus BOOLEAN DEFAULT FALSE,
+      building VARCHAR(255),
+      room_number VARCHAR(50),
+      floor VARCHAR(50),
+      other_location VARCHAR(255),
+      
+      staff_informed VARCHAR(255) NOT NULL,
+      notification_time TIME NOT NULL,
+      team_responding VARCHAR(255) NOT NULL,
+      time_left_clinic TIME NOT NULL,
+      
+      chwc_vehicle BOOLEAN DEFAULT FALSE,
+      sisters_on_foot BOOLEAN DEFAULT FALSE,
+      other_transport BOOLEAN DEFAULT FALSE,
+      other_transport_detail VARCHAR(255),
+      
+      arrival_time TIME NOT NULL,
+      
+      student_number VARCHAR(50) NOT NULL,
+      patient_name VARCHAR(255) NOT NULL,
+      patient_surname VARCHAR(255) NOT NULL,
+      
+      primary_assessment TEXT NOT NULL,
+      intervention TEXT NOT NULL,
+      
+      medical_consent ENUM('give', 'doNotGive') NOT NULL,
+      transport_consent ENUM('consent', 'doNotConsent') NOT NULL,
+      signature VARCHAR(255) NOT NULL,
+      consent_date DATE NOT NULL,
+      
+      pt_chwc_vehicle BOOLEAN DEFAULT FALSE,
+      pt_ambulance BOOLEAN DEFAULT FALSE,
+      pt_other BOOLEAN DEFAULT FALSE,
+      pt_other_detail VARCHAR(255),
+      patient_transported_to VARCHAR(255) NOT NULL,
+      departure_time TIME NOT NULL,
+      
+      chwc_arrival_time TIME NOT NULL,
+      existing_file ENUM('yes', 'no') NOT NULL,
+      referred ENUM('yes', 'no') NOT NULL,
+      hospital_name VARCHAR(255),
+      discharge_condition TEXT NOT NULL,
+      discharge_time TIME NOT NULL,
+      
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `;
+  
+  db.query(createTableSql, (err, result) => {
+    if (err) {
+      console.error('Error creating emergency_onboarding table:', err);
+      return res.status(500).json({ 
+        error: 'Failed to create emergency_onboarding table',
+        details: err.message 
+      });
+    }
+    
+    res.status(200).json({ 
+      message: 'Emergency onboarding table created successfully or already exists',
+      result: result
+    });
+  });
+});
+
+// Save emergency onboarding data
+app.post('/api/emergency-onboarding', (req, res) => {
+  const formData = req.body;
+  
+  // Validate required fields
+  const requiredFields = [
+    'date', 'timeOfCall', 'personResponsible', 'callerName', 'department',
+    'contactNumber', 'problemNature', 'staffInformed', 'notificationTime',
+    'teamResponding', 'timeLeftClinic', 'arrivalTime', 'studentNumber',
+    'patientName', 'patientSurname', 'primaryAssessment', 'intervention',
+    'medicalConsent', 'transportConsent', 'signature', 'consentDate',
+    'patientTransportedTo', 'departureTime', 'chwcArrivalTime',
+    'existingFile', 'referred', 'dischargeCondition', 'dischargeTime'
+  ];
+  
+  for (const field of requiredFields) {
+    if (!formData[field]) {
+      return res.status(400).json({ 
+        error: `Missing required field: ${field}`,
+        details: `The field '${field}' is required`
+      });
+    }
+  }
+
+  const sql = `
+    INSERT INTO emergency_onboarding (
+      date, time_of_call, person_responsible, caller_name, department,
+      contact_number, problem_nature, east_campus, west_campus, education_campus,
+      other_campus, building, room_number, floor, other_location, staff_informed,
+      notification_time, team_responding, time_left_clinic, chwc_vehicle,
+      sisters_on_foot, other_transport, other_transport_detail, arrival_time,
+      student_number, patient_name, patient_surname, primary_assessment,
+      intervention, medical_consent, transport_consent, signature, consent_date,
+      pt_chwc_vehicle, pt_ambulance, pt_other, pt_other_detail,
+      patient_transported_to, departure_time, chwc_arrival_time, existing_file,
+      referred, hospital_name, discharge_condition, discharge_time
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+
+  const values = [
+    formData.date,
+    formData.timeOfCall,
+    formData.personResponsible,
+    formData.callerName,
+    formData.department,
+    formData.contactNumber,
+    formData.problemNature,
+    formData.eastCampus || false,
+    formData.westCampus || false,
+    formData.educationCampus || false,
+    formData.otherCampus || false,
+    formData.building || null,
+    formData.roomNumber || null,
+    formData.floor || null,
+    formData.otherLocation || null,
+    formData.staffInformed,
+    formData.notificationTime,
+    formData.teamResponding,
+    formData.timeLeftClinic,
+    formData.chwcVehicle || false,
+    formData.sistersOnFoot || false,
+    formData.otherTransport || false,
+    formData.otherTransportDetail || null,
+    formData.arrivalTime,
+    formData.studentNumber,
+    formData.patientName,
+    formData.patientSurname,
+    formData.primaryAssessment,
+    formData.intervention,
+    formData.medicalConsent,
+    formData.transportConsent,
+    formData.signature,
+    formData.consentDate,
+    formData.ptCHWCVehicle || false,
+    formData.ptAmbulance || false,
+    formData.ptOther || false,
+    formData.ptOtherDetail || null,
+    formData.patientTransportedTo,
+    formData.departureTime,
+    formData.chwcArrivalTime,
+    formData.existingFile,
+    formData.referred,
+    formData.hospitalName || null,
+    formData.dischargeCondition,
+    formData.dischargeTime
+  ];
+
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error('Database error saving emergency onboarding:', err);
+      return res.status(500).json({ 
+        error: 'Failed to save emergency report',
+        details: err.message 
+      });
+    }
+    
+    res.status(200).json({ 
+      message: 'Emergency report submitted successfully!', 
+      recordId: result.insertId 
+    });
+  });
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Server error:', err);
@@ -686,4 +870,6 @@ app.listen(PORT, () => {
   console.log(`- POST /api/onboarding`);
   console.log(`- POST /api/save-staff-schedule`);
   console.log(`- GET /api/today-staff-schedule`);
+  console.log(`- POST /api/create-emergency-table (for development)`);
+  console.log(`- POST /api/emergency-onboarding`);
 });
