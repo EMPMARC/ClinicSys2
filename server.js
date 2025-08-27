@@ -660,7 +660,6 @@ app.post('/api/create-staff-schedule-table', (req, res) => {
     });
   });
 });
-
 // Create emergency_onboarding table if it doesn't exist
 app.post('/api/create-emergency-table', (req, res) => {
   const createTableSql = `
@@ -806,7 +805,7 @@ app.post('/api/emergency-onboarding', (req, res) => {
     formData.otherTransport || false,
     formData.otherTransportDetail || null,
     formData.arrivalTime,
-    formData.studentNumber,
+    formData.studentNumber, // This was likely missing
     formData.patientName,
     formData.patientSurname,
     formData.primaryAssessment,
@@ -829,6 +828,9 @@ app.post('/api/emergency-onboarding', (req, res) => {
     formData.dischargeTime
   ];
 
+  console.log('SQL values count:', values.length); // Debug log
+  console.log('Values:', values); // Debug log
+
   db.query(sql, values, (err, result) => {
     if (err) {
       console.error('Database error saving emergency onboarding:', err);
@@ -845,6 +847,176 @@ app.post('/api/emergency-onboarding', (req, res) => {
   });
 });
 
+// Get all emergency reports
+app.get('/api/emergency-reports', (req, res) => {
+  const sql = `
+    SELECT 
+      id, date, time_of_call, caller_name, department, 
+      patient_name, patient_surname, student_number,
+      created_at
+    FROM emergency_onboarding 
+    ORDER BY created_at DESC
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error('Database error fetching emergency reports:', err);
+      return res.status(500).json({ 
+        error: 'Failed to fetch emergency reports',
+        details: err.message 
+      });
+    }
+    
+    res.status(200).json({ 
+      reports: results,
+      count: results.length
+    });
+  });
+});
+
+// Get single emergency report by ID
+app.get('/api/emergency-report/:id', (req, res) => {
+  const { id } = req.params;
+
+  const sql = 'SELECT * FROM emergency_onboarding WHERE id = ?';
+
+  db.query(sql, [id], (err, results) => {
+    if (err) {
+      console.error('Database error fetching emergency report:', err);
+      return res.status(500).json({ 
+        error: 'Failed to fetch emergency report',
+        details: err.message 
+      });
+    }
+    
+    if (results.length === 0) {
+      return res.status(404).json({ 
+        error: 'Emergency report not found'
+      });
+    }
+    
+    res.status(200).json({ 
+      report: results[0]
+    });
+  });
+});
+
+// Update emergency report
+app.put('/api/emergency-report/:id', (req, res) => {
+  const { id } = req.params;
+  const formData = req.body;
+
+  const sql = `
+    UPDATE emergency_onboarding SET
+      date = ?, time_of_call = ?, person_responsible = ?, caller_name = ?, department = ?,
+      contact_number = ?, problem_nature = ?, east_campus = ?, west_campus = ?, education_campus = ?,
+      other_campus = ?, building = ?, room_number = ?, floor = ?, other_location = ?, staff_informed = ?,
+      notification_time = ?, team_responding = ?, time_left_clinic = ?, chwc_vehicle = ?,
+      sisters_on_foot = ?, other_transport = ?, other_transport_detail = ?, arrival_time = ?,
+      student_number = ?, patient_name = ?, patient_surname = ?, primary_assessment = ?,
+      intervention = ?, medical_consent = ?, transport_consent = ?, signature = ?, consent_date = ?,
+      pt_chwc_vehicle = ?, pt_ambulance = ?, pt_other = ?, pt_other_detail = ?,
+      patient_transported_to = ?, departure_time = ?, chwc_arrival_time = ?, existing_file = ?,
+      referred = ?, hospital_name = ?, discharge_condition = ?, discharge_time = ?
+    WHERE id = ?
+  `;
+
+  const values = [
+    formData.date,
+    formData.timeOfCall,
+    formData.personResponsible,
+    formData.callerName,
+    formData.department,
+    formData.contactNumber,
+    formData.problemNature,
+    formData.eastCampus || false,
+    formData.westCampus || false,
+    formData.educationCampus || false,
+    formData.otherCampus || false,
+    formData.building || null,
+    formData.roomNumber || null,
+    formData.floor || null,
+    formData.otherLocation || null,
+    formData.staffInformed,
+    formData.notificationTime,
+    formData.teamResponding,
+    formData.timeLeftClinic,
+    formData.chwcVehicle || false,
+    formData.sistersOnFoot || false,
+    formData.otherTransport || false,
+    formData.otherTransportDetail || null,
+    formData.arrivalTime,
+    formData.studentNumber,
+    formData.patientName,
+    formData.patientSurname,
+    formData.primaryAssessment,
+    formData.intervention,
+    formData.medicalConsent,
+    formData.transportConsent,
+    formData.signature,
+    formData.consentDate,
+    formData.ptCHWCVehicle || false,
+    formData.ptAmbulance || false,
+    formData.ptOther || false,
+    formData.ptOtherDetail || null,
+    formData.patientTransportedTo,
+    formData.departureTime,
+    formData.chwcArrivalTime,
+    formData.existingFile,
+    formData.referred,
+    formData.hospitalName || null,
+    formData.dischargeCondition,
+    formData.dischargeTime,
+    id
+  ];
+
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error('Database error updating emergency report:', err);
+      return res.status(500).json({ 
+        error: 'Failed to update emergency report',
+        details: err.message 
+      });
+    }
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ 
+        error: 'Emergency report not found'
+      });
+    }
+    
+    res.status(200).json({ 
+      message: 'Emergency report updated successfully!'
+    });
+  });
+});
+
+// Delete emergency report
+app.delete('/api/emergency-report/:id', (req, res) => {
+  const { id } = req.params;
+
+  const sql = 'DELETE FROM emergency_onboarding WHERE id = ?';
+
+  db.query(sql, [id], (err, result) => {
+    if (err) {
+      console.error('Database error deleting emergency report:', err);
+      return res.status(500).json({ 
+        error: 'Failed to delete emergency report',
+        details: err.message 
+      });
+    }
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ 
+        error: 'Emergency report not found'
+      });
+    }
+    
+    res.status(200).json({ 
+      message: 'Emergency report deleted successfully!'
+    });
+  });
+});
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Server error:', err);
@@ -872,4 +1044,8 @@ app.listen(PORT, () => {
   console.log(`- GET /api/today-staff-schedule`);
   console.log(`- POST /api/create-emergency-table (for development)`);
   console.log(`- POST /api/emergency-onboarding`);
+  console.log(`- GET /api/emergency-reports`);
+  console.log(`- GET /api/emergency-report/:id`);
+  console.log(`- PUT /api/emergency-report/:id`);
+  console.log(`- DELETE /api/emergency-report/:id`);
 });

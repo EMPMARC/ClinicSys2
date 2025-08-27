@@ -2,6 +2,8 @@ import React, { useState } from "react";
 
 const EmergencyOnboardingPage = () => {
   const [formData, setFormData] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState("");
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -13,34 +15,125 @@ const EmergencyOnboardingPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+    setIsSubmitting(true);
+    setSubmitMessage("");
+
     try {
-      const response = await fetch('/api/emergency-onboarding', {
+      // Prepare the data for submission
+      const submissionData = {
+        date: formData.date,
+        timeOfCall: formData.timeOfCall,
+        personResponsible: formData.personResponsible,
+        callerName: formData.callerName,
+        department: formData.department,
+        contactNumber: formData.contactNumber,
+        problemNature: formData.problemNature,
+        
+        // Location of Emergency
+        eastCampus: formData.eastCampus || false,
+        westCampus: formData.westCampus || false,
+        educationCampus: formData.educationCampus || false,
+        otherCampus: formData.otherCampus || false,
+        building: formData.building,
+        roomNumber: formData.roomNumber,
+        floor: formData.floor,
+        otherLocation: formData.otherLocation,
+        
+        // Hand Over
+        staffInformed: formData.staffInformed,
+        notificationTime: formData.notificationTime,
+        teamResponding: formData.teamResponding,
+        timeLeftClinic: formData.timeLeftClinic,
+        
+        // Responding Team Transport
+        chwcVehicle: formData.chwcVehicle || false,
+        sistersOnFoot: formData.sistersOnFoot || false,
+        otherTransport: formData.otherTransport || false,
+        otherTransportDetail: formData.otherTransportDetail,
+        
+        // On Site Emergency Management
+        arrivalTime: formData.arrivalTime,
+        
+        // Patient Information
+        studentNumber: formData.studentNumber,
+        patientName: formData.patientName,
+        patientSurname: formData.patientSurname,
+        
+        // Primary Assessment & Intervention
+        primaryAssessment: formData.primaryAssessment,
+        intervention: formData.intervention,
+        
+        // Consent
+        medicalConsent: formData.medicalConsent,
+        transportConsent: formData.transportConsent,
+        signature: formData.signature,
+        consentDate: formData.consentDate,
+        
+        // Patient Transport
+        ptCHWCVehicle: formData.ptCHWCVehicle || false,
+        ptAmbulance: formData.ptAmbulance || false,
+        ptOther: formData.ptOther || false,
+        ptOtherDetail: formData.ptOtherDetail,
+        patientTransportedTo: formData.patientTransportedTo,
+        departureTime: formData.departureTime,
+        
+        // Case Management at CHWC
+        chwcArrivalTime: formData.chwcArrivalTime,
+        existingFile: formData.existingFile,
+        referred: formData.referred,
+        hospitalName: formData.hospitalName,
+        dischargeCondition: formData.dischargeCondition,
+        dischargeTime: formData.dischargeTime
+      };
+
+      const response = await fetch('http://localhost:5001/api/emergency-onboarding', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(submissionData),
       });
 
       const result = await response.json();
 
       if (response.ok) {
-        console.log("Emergency Report Submitted:", formData);
+        console.log("Emergency Report Submitted:", result);
+        setSubmitMessage("Emergency report submitted successfully!");
         alert("Emergency report submitted successfully!");
+        
+        // Optionally reset the form
+        setFormData({});
       } else {
-        console.error("Submission failed:", result.error);
-        alert(`Submission failed: ${result.error}`);
+        console.error("Submission error:", result);
+        setSubmitMessage(`Error: ${result.error} - ${result.details || ''}`);
+        alert(`Error: ${result.error}\n${result.details || ''}`);
       }
     } catch (error) {
-      console.error("Error submitting emergency report:", error);
-      alert("Error submitting emergency report. Please try again.");
+      console.error("Network error:", error);
+      setSubmitMessage("Network error. Please check your connection and try again.");
+      alert("Network error. Please check your connection and try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <div style={{ padding: "20px", maxWidth: "900px", margin: "auto" }}>
       <h1>Emergency Onboarding</h1>
+      
+      {submitMessage && (
+        <div style={{
+          padding: "10px",
+          margin: "10px 0",
+          backgroundColor: submitMessage.includes("Error") ? "#ffebee" : "#e8f5e8",
+          border: submitMessage.includes("Error") ? "1px solid #f44336" : "1px solid #4caf50",
+          color: submitMessage.includes("Error") ? "#d32f2f" : "#2e7d32",
+          borderRadius: "4px"
+        }}>
+          {submitMessage}
+        </div>
+      )}
+      
       <form onSubmit={handleSubmit}>
         {/* EMERGENCY REPORT */}
         <fieldset>
@@ -162,7 +255,13 @@ const EmergencyOnboardingPage = () => {
           <label>Time of Discharge: <input type="time" name="dischargeTime" onChange={handleChange} required /></label>
         </fieldset>
 
-        <button type="submit" style={{ marginTop: "20px", padding: "10px 20px" }}>Submit Report</button>
+        <button 
+          type="submit" 
+          style={{ marginTop: "20px", padding: "10px 20px" }}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "Submitting..." : "Submit Report"}
+        </button>
       </form>
     </div>
   );

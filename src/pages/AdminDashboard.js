@@ -11,21 +11,85 @@ const AdminDashboard = () => {
     navigate("/");
   };
 
-  return (
-    <div style={{ padding: 24 }}>
-      <h1>Welcome, {user?.name || "Admin"}</h1>
-      <p>Choose what you want to do today:</p>
+  // Styles
+  const containerStyle = {
+    fontFamily: "Arial, sans-serif",
+    backgroundColor: "#f5f7fa",
+    minHeight: "100vh",
+    padding: "20px",
+  };
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
-        <button onClick={() => navigate("/staff-schedule")}>View / Manage Schedule</button>
-        <button onClick={() => navigate("/emergency-onboarding")}>Emergency Onboarding</button>
-        <button onClick={() => navigate("/modify-booking")}>Modify Booking</button>
-        {/* Visible for all staff during testing */}
-        <button onClick={() => navigate("/approve-proof")}>Approve Proof of Registration</button>
+  const headerStyle = {
+    backgroundColor: "#4a4a4a",
+    color: "white",
+    padding: "15px 20px",
+    borderRadius: "8px",
+    textAlign: "center",
+    marginBottom: "30px",
+  };
+
+  const buttonContainerStyle = {
+    display: "flex",
+    flexDirection: "column",
+    gap: "15px",
+    maxWidth: "400px",
+    margin: "0 auto",
+  };
+
+  const buttonStyle = {
+    padding: "12px 20px",
+    border: "none",
+    borderRadius: "6px",
+    fontSize: "16px",
+    cursor: "pointer",
+    backgroundColor: "#007bff",
+    color: "white",
+    boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+    transition: "0.3s",
+  };
+
+  const logoutStyle = {
+    ...buttonStyle,
+    backgroundColor: "#dc3545",
+    marginTop: "25px",
+  };
+
+  return (
+    <div style={containerStyle}>
+      {/* Header */}
+      <div style={headerStyle}>
+        <h1>Welcome, {user?.name || "Admin"}</h1>
+        <p>Choose what you want to do today:</p>
       </div>
 
-      <div style={{ marginTop: 24 }}>
-        <button onClick={logout}>Log out</button>
+      {/* Buttons */}
+      <div style={buttonContainerStyle}>
+        <button style={buttonStyle} onClick={() => navigate("/staff-schedule")}>
+          View / Manage Schedule
+        </button>
+        <button style={buttonStyle} onClick={() => navigate("/emergency-onboarding")}>
+          Emergency Onboarding
+        </button>
+        <button style={buttonStyle} onClick={() => navigate("/modify-booking")}>
+          Modify Booking
+        </button>
+        <button style={buttonStyle} onClick={() => navigate("/approve-proof")}>
+          Approve Proof of Registration
+        </button>
+
+        {/* Admin-only Reports Button */}
+        {user?.role === "admin" && (
+          <button style={buttonStyle} onClick={() => navigate("/new-report")}>
+            View Reports
+          </button>
+        )}
+      </div>
+
+      {/* Logout */}
+      <div style={{ textAlign: "center" }}>
+        <button style={logoutStyle} onClick={logout}>
+          Log out
+        </button>
       </div>
     </div>
   );

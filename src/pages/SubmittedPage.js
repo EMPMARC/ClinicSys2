@@ -37,10 +37,10 @@ const Submitted = () => {
         You have submitted the form and we will notify you on the next steps.
       </p>
       <p style={{ fontSize: "1.25rem", color: "#374151", marginBottom: "1rem" }}>
-        You may review your submission on the <strong>My Submissions</strong> tab in the menu.
+        You may review your appointment on the <strong>My Submissions</strong> page.
       </p>
       <p style={{ fontSize: "1.25rem", color: "#374151", marginBottom: "2rem" }}>
-        Click on the Continue button below.
+        Click on the Continue button below to view your appointments.
       </p>
 
       <button
@@ -57,14 +57,14 @@ const Submitted = () => {
           boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.1)"
         }}
       >
-        CONTINUE
+        VIEW MY APPOINTMENTS
       </button>
 
       <footer style={{ marginTop: "3rem", fontSize: "0.875rem", color: "#6b7280" }}>
-        © 2025 Wits
+        © 2025 Wits University - Campus Health and Wellness Centre
       </footer>
     </div>
   );
 };
 
-export default Submitted;
+export default Submitted;

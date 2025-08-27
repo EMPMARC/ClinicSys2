@@ -54,18 +54,6 @@ const PatientDashboard = () => {
       alert("Please upload and get your proof of registration approved first.");
       return;
     }
-    if (action === "health-wellness-booking" && !progress.booking) {
-      alert("Please book your first appointment before accessing Health & Wellness Booking.");
-      return;
-    }
-    if (action === "follow-up-booking" && !progress.booking) {
-      alert("You must have a previous appointment before making a follow-up booking.");
-      return;
-    }
-    if (action === "my-submissions" && !progress.submission) {
-      alert("No submissions found. Please submit something first.");
-      return;
-    }
 
     // Simulate marking a step as done (remove this in real version)
     if (action === "onboarding") completeStep("onboarding");
@@ -74,44 +62,6 @@ const PatientDashboard = () => {
     if (action === "my-submissions") completeStep("submission");
 
     navigate("/" + action);
-  };
-
-  // Format date for display
-  const formatDate = (dateString) => {
-    if (!dateString) return "Date not set";
-    
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
-  };
-
-  // Format time for display
-  const formatTime = (timeString) => {
-    if (!timeString) return "Time not set";
-    
-    const time = timeString.split(':');
-    const hours = parseInt(time[0]);
-    const minutes = time[1];
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    const formattedHours = hours % 12 || 12;
-    
-    return `${formattedHours}:${minutes} ${ampm}`;
-  };
-
-  // Get appointment status based on date
-  const getAppointmentStatus = (appointmentDate) => {
-    if (!appointmentDate) return "scheduled";
-    
-    const today = new Date();
-    const appointment = new Date(appointmentDate);
-    
-    if (appointment < today) return "completed";
-    if (appointment.toDateString() === today.toDateString()) return "today";
-    return "upcoming";
   };
 
   return (
@@ -185,158 +135,42 @@ const PatientDashboard = () => {
           >
             {progress.booking ? '✓ ' : ''}Book New Appointment
           </button>
-          <button 
-            onClick={() => handleClick("health-wellness-booking")}
-            style={{
-              padding: '12px',
-              backgroundColor: '#3498db',
-              color: 'white',
-              border: 'none',
-              borderRadius: 6,
-              cursor: 'pointer',
-              textAlign: 'left'
-            }}
-          >
-            Health & Wellness Booking
-          </button>
-          <button 
-            onClick={() => handleClick("follow-up-booking")}
-            style={{
-              padding: '12px',
-              backgroundColor: '#3498db',
-              color: 'white',
-              border: 'none',
-              borderRadius: 6,
-              cursor: 'pointer',
-              textAlign: 'left'
-            }}
-          >
-            Follow-up Booking
-          </button>
-          <button 
-            onClick={() => handleClick("my-submissions")}
-            style={{
-              padding: '12px',
-              backgroundColor: progress.submission ? '#27ae60' : '#3498db',
-              color: 'white',
-              border: 'none',
-              borderRadius: 6,
-              cursor: 'pointer',
-              textAlign: 'left'
-            }}
-          >
-            {progress.submission ? '✓ ' : ''}View My Submissions
-          </button>
         </div>
       </div>
 
-      <div style={{ marginTop: 32 }}>
-        <h2 style={{ color: '#2c3e50', borderBottom: '2px solid #ecf0f1', paddingBottom: 8 }}>
-          Your Appointments
-          {appointments.length > 0 && <span style={{ fontSize: '0.8em', color: '#7f8c8d', marginLeft: 10 }}>
-            ({appointments.length} {appointments.length === 1 ? 'appointment' : 'appointments'})
-          </span>}
-        </h2>
+      {/* Quick Overview Section */}
+      <div style={{ 
+        backgroundColor: '#f8f9fa', 
+        padding: 20, 
+        borderRadius: 8, 
+        marginBottom: 24,
+        borderLeft: '4px solid #2ecc71'
+      }}>
+        <h2 style={{ color: '#2c3e50', marginTop: 0 }}>Quick Overview</h2>
         
-        {appointments.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {appointments.map(appt => {
-              const status = getAppointmentStatus(appt.appointment_date);
-              const statusColors = {
-                upcoming: '#3498db',
-                today: '#e67e22',
-                completed: '#27ae60',
-                scheduled: '#95a5a6'
-              };
-              
-              return (
-                <div 
-                  key={appt.id} 
-                  style={{
-                    border: '1px solid #ddd',
-                    borderRadius: 8,
-                    padding: 16,
-                    backgroundColor: 'white',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}
-                >
-                  <div style={{ flex: 1 }}>
-                    <div style={{ 
-                      display: 'inline-block', 
-                      backgroundColor: statusColors[status],
-                      color: 'white',
-                      padding: '4px 8px',
-                      borderRadius: 4,
-                      fontSize: '0.7em',
-                      fontWeight: 'bold',
-                      marginBottom: 8
-                    }}>
-                      {status.toUpperCase()}
-                    </div>
-                    <h3 style={{ margin: '8px 0', color: '#2c3e50' }}>{appt.appointment_for}</h3>
-                    <div style={{ color: '#7f8c8d', fontSize: '0.9em' }}>
-                      <div>
-                        <strong>Date:</strong> {formatDate(appt.appointment_date)}
-                      </div>
-                      <div>
-                        <strong>Time:</strong> {formatTime(appt.appointment_time)}
-                      </div>
-                      <div>
-                        <strong>Reference:</strong> {appt.reference_number}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div style={{ textAlign: 'right' }}>
-                    <button
-                      style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#3498db',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: 4,
-                        cursor: 'pointer',
-                        fontSize: '0.9em'
-                      }}
-                      onClick={() => {
-                        // Add functionality for viewing appointment details
-                        alert(`Appointment details for ${appt.reference_number}`);
-                      }}
-                    >
-                      View Details
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ color: '#2c3e50', margin: 0 }}>Appointments</h3>
+            <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#3498db', margin: '5px 0' }}>
+              {appointments.length}
+            </p>
+            <p style={{ margin: 0, color: '#7f8c8d' }}>Total appointments</p>
           </div>
-        ) : (
-          <div style={{ 
-            textAlign: 'center', 
-            padding: 40, 
-            backgroundColor: '#f8f9fa', 
-            borderRadius: 8,
-            color: '#7f8c8d'
-          }}>
-            <p style={{ fontSize: '1.2em', marginBottom: 16 }}>No appointments scheduled yet</p>
-            <button 
-              onClick={() => handleClick("booking")}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: '#3498db',
-                color: 'white',
-                border: 'none',
-                borderRadius: 4,
-                cursor: 'pointer'
-              }}
-            >
-              Book Your First Appointment
-            </button>
-          </div>
-        )}
+          
+          <button 
+            onClick={() => handleClick("my-submissions")}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: '#3498db',
+              color: 'white',
+              border: 'none',
+              borderRadius: 6,
+              cursor: 'pointer'
+            }}
+          >
+            View My Submissions
+          </button>
+        </div>
       </div>
     </div>
   );
