@@ -11,7 +11,7 @@ const PatientDashboard = () => {
   const progress = JSON.parse(localStorage.getItem("patientProgress") || "{}");
 
   useEffect(() => {
-    // Fetch appointment count only
+    // Fetch appointment count
     const fetchAppointmentCount = async () => {
       try {
         const response = await fetch(`http://localhost:5001/api/student-appointments/${studentNumber}`);
@@ -27,10 +27,42 @@ const PatientDashboard = () => {
       }
     };
 
+    // Check current onboarding and POR status (in case they were updated elsewhere)
+    const checkCurrentStatus = async () => {
+      try {
+        const onboardingResponse = await fetch('http://localhost:5001/api/check-onboarding', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ studentNumber }),
+        });
+        
+        const onboardingData = await onboardingResponse.json();
+        
+        const porResponse = await fetch(`http://localhost:5001/api/student-files/${studentNumber}`);
+        const porData = await porResponse.json();
+        
+        if (onboardingResponse.ok && porResponse.ok) {
+          const currentProgress = {
+            onboarding: onboardingData.exists,
+            proofUploaded: porData.files && porData.files.length > 0,
+            booking: progress.booking || false,
+            submission: progress.submission || false
+          };
+          
+          localStorage.setItem('patientProgress', JSON.stringify(currentProgress));
+        }
+      } catch (error) {
+        console.error('Error checking current status:', error);
+      }
+    };
+
     if (studentNumber) {
       fetchAppointmentCount();
+      checkCurrentStatus();
     }
-  }, [studentNumber]);
+  }, [studentNumber, progress.booking, progress.submission]);
 
   const logout = () => {
     localStorage.removeItem("user");

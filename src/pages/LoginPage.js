@@ -45,31 +45,24 @@ const LoginPage = () => {
         localStorage.setItem('studentNumber', identifier);
         // Clear staff number if it exists
         localStorage.removeItem('staffNumber');
+        
+        // Save onboarding and POR status to progress
+        const progress = {
+          onboarding: data.onboardingCompleted || false,
+          proofUploaded: data.porUploaded || false,
+          booking: false,
+          submission: false
+        };
+        localStorage.setItem('patientProgress', JSON.stringify(progress));
       }
 
       // For students, check if they've completed onboarding
       if (data.userType === 'student') {
-        try {
-          const onboardingCheck = await fetch('http://localhost:5001/api/check-onboarding', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ studentNumber: identifier }),
-          });
-          
-          const onboardingData = await onboardingCheck.json();
-          
-          if (onboardingCheck.ok && onboardingData.exists) {
-            // Student has completed onboarding, go to dashboard
-            navigate('/patient-dashboard');
-          } else {
-            // Student needs to complete onboarding
-            navigate('/onboarding');
-          }
-        } catch (err) {
-          console.error('Error checking onboarding status:', err);
-          // If there's an error checking, send to onboarding to be safe
+        if (data.onboardingCompleted) {
+          // Student has completed onboarding, go to dashboard
+          navigate('/patient-dashboard');
+        } else {
+          // Student needs to complete onboarding
           navigate('/onboarding');
         }
       } 
@@ -96,6 +89,7 @@ const LoginPage = () => {
     localStorage.removeItem('user');
     localStorage.removeItem('role');
     localStorage.removeItem('userType');
+    localStorage.removeItem('patientProgress');
   }, []);
 
   return (

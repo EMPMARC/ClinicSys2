@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const RegistrationCapturePage = () => {
@@ -10,13 +10,8 @@ const RegistrationCapturePage = () => {
   
   const studentNumber = localStorage.getItem('studentNumber');
 
-  useEffect(() => {
-    if (studentNumber) {
-      fetchUploadedFiles();
-    }
-  }, [studentNumber]);
-
-  const fetchUploadedFiles = async () => {
+  // Wrap fetchUploadedFiles with useCallback to memoize it
+  const fetchUploadedFiles = useCallback(async () => {
     try {
       const response = await fetch(`http://localhost:5001/api/student-files/${studentNumber}`);
       const data = await response.json();
@@ -27,7 +22,13 @@ const RegistrationCapturePage = () => {
     } catch (error) {
       console.error('Error fetching uploaded files:', error);
     }
-  };
+  }, [studentNumber]); // Add studentNumber as dependency
+
+  useEffect(() => {
+    if (studentNumber) {
+      fetchUploadedFiles();
+    }
+  }, [studentNumber, fetchUploadedFiles]); // Now includes fetchUploadedFiles in dependencies
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -87,10 +88,11 @@ const RegistrationCapturePage = () => {
         
         // Mark proof as uploaded in progress
         const progress = JSON.parse(localStorage.getItem("patientProgress") || "{}");
-        localStorage.setItem("patientProgress", JSON.stringify({
+        const updatedProgress = {
           ...progress,
           proofUploaded: true
-        }));
+        };
+        localStorage.setItem("patientProgress", JSON.stringify(updatedProgress));
         
         // Refresh uploaded files list
         fetchUploadedFiles();

@@ -73,8 +73,37 @@ const upload = multer({
   }
 });
 
-// Login endpoint - UPDATED to check both users and students tables
-app.post('/api/login', (req, res) => {
+// Helper functions for checking status
+async function checkOnboardingStatus(studentNumber) {
+  return new Promise((resolve) => {
+    const sql = 'SELECT id FROM onboarding_students WHERE student_number = ?';
+    db.query(sql, [studentNumber], (err, results) => {
+      if (err) {
+        console.error('Database error checking onboarding:', err);
+        resolve({ exists: false });
+      } else {
+        resolve({ exists: results.length > 0 });
+      }
+    });
+  });
+}
+
+async function checkPORStatus(studentNumber) {
+  return new Promise((resolve) => {
+    const sql = 'SELECT id FROM por_uploads WHERE student_number = ?';
+    db.query(sql, [studentNumber], (err, results) => {
+      if (err) {
+        console.error('Database error checking POR:', err);
+        resolve({ exists: false });
+      } else {
+        resolve({ exists: results.length > 0 });
+      }
+    });
+  });
+}
+
+// Login endpoint - UPDATED to check both users and students tables and return status
+app.post('/api/login', async (req, res) => {
   const { identifier, password, userType } = req.body;
   
   if (!identifier || !password || !userType) {
@@ -150,10 +179,16 @@ app.post('/api/login', (req, res) => {
         
         const { password: _, ...studentWithoutPassword } = student;
         
+        // Check both onboarding and POR status
+        const onboardingCheck = await checkOnboardingStatus(identifier);
+        const porCheck = await checkPORStatus(identifier);
+        
         res.status(200).json({
           message: 'Login successful',
           user: studentWithoutPassword,
-          userType: 'student'
+          userType: 'student',
+          onboardingCompleted: onboardingCheck.exists,
+          porUploaded: porCheck.exists
         });
       } catch (error) {
         console.error('Error comparing passwords:', error);
@@ -185,6 +220,28 @@ app.post('/api/check-onboarding', (req, res) => {
     exists: results.length > 0
   });
 });
+});
+
+// Check if student has uploaded proof of registration
+app.post('/api/check-por', (req, res) => {
+  const { studentNumber } = req.body;
+  
+  if (!studentNumber) {
+    return res.status(400).json({ error: 'Student number is required' });
+  }
+
+  const sql = 'SELECT id FROM por_uploads WHERE student_number = ?';
+  
+  db.query(sql, [studentNumber], (err, results) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Database error', details: err.message });
+    }
+    
+    res.status(200).json({ 
+      exists: results.length > 0
+    });
+  });
 });
 
 // Update your existing upload-por endpoint to use multer
@@ -743,7 +800,7 @@ app.post('/api/onboarding', (req, res) => {
         return res.status(500).json({ 
           error: 'Failed to save data',
           details: err.message 
-        });
+      });
       }
       
       res.status(200).json({ 
@@ -1339,8 +1396,9 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`Backend running on http://localhost:${PORT}`);
   console.log(`Available endpoints:`);
-  console.log(`- POST /api/login (UPDATED for student login)`);
+  console.log(`- POST /api/login (UPDATED for student login with status)`);
   console.log(`- POST /api/check-onboarding`);
+  console.log(`- POST /api/check-por (NEW)`);
   console.log(`- POST /api/upload-por`);
   console.log(`- POST /api/save-appointment (UPDATED for student number)`);
   console.log(`- GET /api/student-appointments/:studentNumber (FIXED)`);

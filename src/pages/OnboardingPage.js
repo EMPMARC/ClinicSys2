@@ -227,6 +227,15 @@ function OnboardingPage() {
       
       if (response.ok) {
         console.log("Form submitted successfully!", result);
+        
+        // Mark onboarding as completed in progress
+        const progress = JSON.parse(localStorage.getItem("patientProgress") || "{}");
+        const updatedProgress = {
+          ...progress,
+          onboarding: true
+        };
+        localStorage.setItem("patientProgress", JSON.stringify(updatedProgress));
+        
         navigate("/upload-proof");
       } else {
         console.error("Failed to submit form:", result.error);
