@@ -3,6 +3,9 @@ const mysql = require('mysql2');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcrypt');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const app = express();
 const PORT = 5001;
 
@@ -35,6 +38,39 @@ db.getConnection((err, connection) => {
 // Test route
 app.get('/', (req, res) => {
   res.send('Backend is working!');
+});
+
+// Add this after your other middleware
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = 'uploads';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir);
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + '-' + file.originalname);
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|pdf|doc|docx|txt/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Invalid file type'));
+    }
+  }
 });
 
 // Login endpoint - UPDATED to check both users and students tables
@@ -151,73 +187,140 @@ app.post('/api/check-onboarding', (req, res) => {
 });
 });
 
-// Upload Proof of Registration endpoint 
-app.post('/api/upload-por', (req, res) => {
-const { studentNumber, fileName, fileData } = req.body;
+// Update your existing upload-por endpoint to use multer
+app.post('/api/upload-por-multer', upload.single('document'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
 
-if (!studentNumber || !fileName || !fileData) {
-  return res.status(400).json({ 
-    error: 'Student number, file name, and file data are required' 
-  });
-}
+    const { studentNumber } = req.body;
+    
+    if (!studentNumber) {
+      return res.status(400).json({ error: 'Student number is required' });
+    }
 
-// Validate file type by checking file extension
-if (!fileName.toLowerCase().endsWith('.pdf')) {
-  return res.status(400).json({ 
-    error: 'Only PDF files are allowed' 
-  });
-}
+    const fileData = {
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      path: req.file.path,
+      studentNumber: studentNumber,
+      uploadDate: new Date()
+    };
 
-  // Check if file already exists for this student
-  const checkSql = 'SELECT id FROM por_uploads WHERE student_number = ?';
-  
-  db.query(checkSql, [studentNumber], (err, results) => {
+   // Check if file already exists for this student
+    const checkSql = 'SELECT id FROM por_uploads WHERE student_number = ?';
+    
+    db.query(checkSql, [studentNumber], (err, results) => {
+      if (err) {
+        console.error('Database error checking existing records:', err);
+        return res.status(500).json({ 
+          error: 'Database error',
+          details: 'Failed to check existing records: ' + err.message
+        });
+      }
+      
+      if (results.length > 0) {
+        // Update existing record
+        const updateSql = 'UPDATE por_uploads SET file_name = ?, file_path = ?, file_size = ?, mimetype = ?, uploaded_at = NOW() WHERE student_number = ?';
+        
+        db.query(updateSql, [fileData.originalName, fileData.path, fileData.size, fileData.mimetype, studentNumber], (err, result) => {
+          if (err) {
+            console.error('Database error updating file:', err);
+            return res.status(500).json({ 
+              error: 'Database error',
+              details: 'Failed to update file: ' + err.message
+            });
+          }
+          
+          res.status(200).json({ 
+            message: 'File updated successfully!',
+            file: fileData
+          });
+        });
+      } else {
+        // Insert new record
+        const insertSql = 'INSERT INTO por_uploads (student_number, file_name, file_path, file_size, mimetype, uploaded_at) VALUES (?, ?, ?, ?, ?, NOW())';
+        
+        db.query(insertSql, [studentNumber, fileData.originalName, fileData.path, fileData.size, fileData.mimetype], (err, result) => {
+          if (err) {
+            console.error('Database error saving file:', err);
+            return res.status(500).json({ 
+              error: 'Database error',
+              details: 'Failed to save file: ' + err.message
+            });
+          }
+          
+          res.status(200).json({ 
+            message: 'File saved successfully!', 
+            file: fileData
+          });
+        });
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+// Add endpoint to get uploaded files
+app.get('/api/student-files/:studentNumber', (req, res) => {
+  const { studentNumber } = req.params;
+
+  const sql = `
+    SELECT id, file_name, file_size, mimetype, uploaded_at
+    FROM por_uploads 
+    WHERE student_number = ?
+    ORDER BY uploaded_at DESC
+  `;
+
+  db.query(sql, [studentNumber], (err, results) => {
     if (err) {
-      console.error('Database error checking existing records:', err);
+      console.error('Database error fetching files:', err);
       return res.status(500).json({ 
-        error: 'Database error',
-        details: 'Failed to check existing records: ' + err.message
+        error: 'Failed to fetch files',
+        details: err.message 
       });
     }
-    if (results.length > 0) {
-      // Update existing record
-      const updateSql = 'UPDATE por_uploads SET file_name = ?, file_data = ?, uploaded_at = NOW() WHERE student_number = ?';
-      
-      db.query(updateSql, [fileName, Buffer.from(fileData, 'base64'), studentNumber], (err, result) => {
-        if (err) {
-          console.error('Database error updating file:', err);
-          return res.status(500).json({ 
-            error: 'Database error',
-            details: 'Failed to update file: ' + err.message
-          });
-        }
-        
-        res.status(200).json({ 
-          message: 'File updated successfully!',
-          recordId: result.insertId 
-        });
-      });
-    } else {
-      // Insert new record
-      const insertSql = 'INSERT INTO por_uploads (student_number, file_name, file_data, uploaded_at) VALUES (?, ?, ?, NOW())';
-      
-      db.query(insertSql, [studentNumber, fileName, Buffer.from(fileData, 'base64')], (err, result) => {
-        if (err) {
-          console.error('Database error saving file:', err);
-          return res.status(500).json({ 
-            error: 'Database error',
-            details: 'Failed to save file: ' + err.message
-          });
-        }
-        
-        res.status(200).json({ 
-          message: 'File saved successfully!', 
-          recordId: result.insertId 
-        });
-      });
-    }
+    
+    res.status(200).json({ 
+      files: results,
+      count: results.length
+    });
   });
 });
+
+// Add endpoint to download file
+app.get('/api/download-file/:id', (req, res) => {
+  const { id } = req.params;
+
+  const sql = 'SELECT file_path, file_name, mimetype FROM por_uploads WHERE id = ?';
+  
+  db.query(sql, [id], (err, results) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Database error', details: err.message });
+    }
+    
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+    
+    const file = results[0];
+    
+    if (!fs.existsSync(file.file_path)) {
+      return res.status(404).json({ error: 'File not found on server' });
+    }
+    
+    res.setHeader('Content-Type', file.mimetype);
+    res.setHeader('Content-Disposition', `attachment; filename="${file.file_name}"`);
+    
+    const fileStream = fs.createReadStream(file.file_path);
+    fileStream.pipe(res);
+  });
+});
+
 
 // Create appointments table if it doesn't exist
 app.post('/api/create-appointments-table', (req, res) => {
@@ -515,33 +618,30 @@ db.query(sql, (err, results) => {
 });
 });
 
-// Create POR uploads table if it doesn't exist (for development)
-app.post('/api/create-por-table', (req, res) => {
-const createTableSql = `
-  CREATE TABLE IF NOT EXISTS por_uploads (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    student_number VARCHAR(50) NOT NULL,
-    file_name VARCHAR(255) NOT NULL,
-    file_data LONGBLOB NOT NULL,
-    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_student (student_number)
-  )
-`;
+// Update the POR uploads table structure to include file_path
+app.post('/api/update-por-table-structure', (req, res) => {
+  const alterTableSql = `
+    ALTER TABLE por_uploads 
+    ADD COLUMN IF NOT EXISTS file_path VARCHAR(255) AFTER file_name,
+    ADD COLUMN IF NOT EXISTS file_size INT AFTER file_path,
+    ADD COLUMN IF NOT EXISTS mimetype VARCHAR(100) AFTER file_size,
+    MODIFY COLUMN file_data LONGBLOB NULL
+  `;
 
-db.query(createTableSql, (err, result) => {
-  if (err) {
-    console.error('Error creating table:', err);
-    return res.status(500).json({ 
-      error: 'Failed to create table',
-      details: err.message 
+  db.query(alterTableSql, (err, result) => {
+    if (err) {
+      console.error('Error updating POR table structure:', err);
+      return res.status(500).json({ 
+        error: 'Failed to update POR table structure',
+        details: err.message 
+      });
+    }
+    
+    res.status(200).json({ 
+      message: 'POR table structure updated successfully',
+      result: result
     });
-  }
-  
-  res.status(200).json({ 
-    message: 'Table created successfully or already exists',
-    result: result
   });
-});
 });
 
 // Update appointments table to use student_number instead of user_id/staff_number
