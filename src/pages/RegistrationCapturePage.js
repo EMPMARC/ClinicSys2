@@ -1,179 +1,136 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // Remove unused 'useLocation' import
 
-function RegistrationCapturePage() {
-  const [file, setFile] = useState(null);
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+const RegistrationCapturePage = () => {
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadStatus, setUploadStatus] = useState('');
+  // Remove unused 'location' variable
   const navigate = useNavigate();
+  
+  // Get student number from localStorage (set during login)
+  const studentNumber = localStorage.getItem('studentNumber');
 
   const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
-    if (selectedFile && selectedFile.type === "application/pdf") {
-      setFile(selectedFile);
-      setError("");
-      setMessage("");
+    const file = e.target.files[0];
+    if (file && file.type === 'application/pdf') {
+      setSelectedFile(file);
+      setUploadStatus('');
     } else {
-      setFile(null);
-      setError("Please upload a valid PDF document.");
+      setUploadStatus('Please select a PDF file');
     }
   };
 
-  const handleSave = () => {
-    if (!file) {
-      setError("Please upload a file before saving.");
+  const handleUpload = () => {
+    if (!selectedFile) {
+      setUploadStatus('Please select a file first');
       return;
     }
-    
-    setIsLoading(true);
-    setError("");
-    
-    // Get student number from localStorage (set during login)
-    const studentNumber = localStorage.getItem('staffNumber');
-    
+
     if (!studentNumber) {
-      setError("Student number not found. Please log in again.");
-      setIsLoading(false);
+      setUploadStatus('Student number not found. Please login again.');
+      navigate('/');
       return;
     }
-    
-    // Convert file to base64 for storage
+
     const reader = new FileReader();
-    reader.readAsDataURL(file);
-    
-    reader.onload = async () => {
-      try {
-        const base64File = reader.result.split(',')[1]; // Remove data URL prefix
-        
-        const response = await fetch('http://localhost:5001/api/upload-por', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            studentNumber: studentNumber,
-            fileName: file.name,
-            fileData: base64File
-          }),
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(data.error || data.details || 'Failed to save file');
+    reader.onload = (e) => {
+      const fileData = e.target.result.split(',')[1]; // Get base64 data
+
+      fetch('http://localhost:5001/api/upload-por', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          studentNumber: studentNumber,
+          fileName: selectedFile.name,
+          fileData: fileData
+        }),
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.message) {
+          setUploadStatus('File uploaded successfully!');
+          setSelectedFile(null);
+          
+          // Mark proof as uploaded in progress
+          const progress = JSON.parse(localStorage.getItem("patientProgress") || "{}");
+          localStorage.setItem("patientProgress", JSON.stringify({
+            ...progress,
+            proofUploaded: true
+          }));
+        } else {
+          setUploadStatus('Error: ' + data.error);
         }
-        
-        setMessage("File saved successfully!");
-      } catch (err) {
-        setError(err.message || "Failed to save file. Please try again.");
-        console.error("Upload error:", err);
-      } finally {
-        setIsLoading(false);
-      }
+      })
+      .catch(error => {
+        setUploadStatus('Error uploading file: ' + error.message);
+      });
     };
-    
-    reader.onerror = () => {
-      setError("Failed to read file. Please try again.");
-      setIsLoading(false);
-    };
+    reader.readAsDataURL(selectedFile);
   };
 
-  const handleUpdate = () => {
-    setFile(null);
-    setError("");
-    setMessage("You can now upload a new file.");
-    document.getElementById("fileInput").value = "";
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!file) {
-      setError("You must upload a PDF before continuing.");
-      return;
-    }
-    
-    // If file was already saved, just navigate to booking
-    if (message === "File saved successfully!") {
-      setMessage("File uploaded successfully!");
-      setTimeout(() => {
-        navigate("/booking");
-      }, 1500);
-    } else {
-      // If not saved yet, save first then navigate
-      handleSave();
-    }
+  const handleBackToDashboard = () => {
+    navigate('/patient-dashboard');
   };
 
   return (
-    <div style={{ padding: "30px", fontFamily: "Arial", textAlign: "center" }}>
-      <h1>Upload Proof of Registration</h1>
-      <form onSubmit={handleSubmit}>
-        <input
-          type="file"
-          id="fileInput"
-          accept=".pdf"
-          onChange={handleFileChange}
-          style={{ margin: "10px 0" }}
+    <div style={{ padding: '20px', maxWidth: '500px', margin: '0 auto' }}>
+      <h2>Upload Proof of Registration</h2>
+      <p><strong>Student Number:</strong> {studentNumber}</p>
+      
+      <div style={{ marginBottom: '15px' }}>
+        <input 
+          type="file" 
+          accept=".pdf" 
+          onChange={handleFileChange} 
+          style={{ marginBottom: '10px' }}
         />
-        {error && <div style={{ color: "red", marginTop: "10px" }}>{error}</div>}
-        {message && <div style={{ color: "green", marginTop: "10px" }}>{message}</div>}
-        {file && <div style={{ marginTop: "10px" }}>Selected File: {file.name}</div>}
-
-        <div style={{ marginTop: "20px" }}>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={isLoading}
-            style={{
-              padding: "10px 20px",
-              backgroundColor: isLoading ? "#6c757d" : "#28a745",
-              color: "#fff",
-              border: "none",
-              borderRadius: "4px",
-              marginRight: "10px",
-              cursor: isLoading ? "not-allowed" : "pointer"
-            }}
-          >
-            {isLoading ? "Saving..." : "Save File"}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleUpdate}
-            disabled={isLoading}
-            style={{
-              padding: "10px 20px",
-              backgroundColor: "#6c757d",
-              color: "#fff",
-              border: "none",
-              borderRadius: "4px",
-              marginRight: "10px",
-              cursor: isLoading ? "not-allowed" : "pointer"
-            }}
-          >
-            Update File
-          </button>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            style={{
-              padding: "10px 20px",
-              backgroundColor: "#007bff",
-              color: "#fff",
-              border: "none",
-              borderRadius: "4px",
-              cursor: isLoading ? "not-allowed" : "pointer"
-            }}
-          >
-            Submit & Continue
-          </button>
+      </div>
+      
+      <button 
+        onClick={handleUpload} 
+        disabled={!selectedFile}
+        style={{
+          padding: '10px 20px',
+          backgroundColor: !selectedFile ? '#ccc' : '#007bff',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: !selectedFile ? 'not-allowed' : 'pointer',
+          marginRight: '10px'
+        }}
+      >
+        Upload Document
+      </button>
+      
+      <button 
+        onClick={handleBackToDashboard}
+        style={{
+          padding: '10px 20px',
+          backgroundColor: '#6c757d',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer'
+        }}
+      >
+        Back to Dashboard
+      </button>
+      
+      {uploadStatus && (
+        <div style={{ 
+          marginTop: '15px', 
+          padding: '10px', 
+          backgroundColor: uploadStatus.includes('Error') ? '#f8d7da' : '#d4edda',
+          color: uploadStatus.includes('Error') ? '#721c24' : '#155724',
+          borderRadius: '4px'
+        }}>
+          {uploadStatus}
         </div>
-      </form>
+      )}
     </div>
   );
-}
+};
 
 export default RegistrationCapturePage;

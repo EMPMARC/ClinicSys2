@@ -81,21 +81,32 @@ function OnboardingPage() {
   const [alreadyOnboarded, setAlreadyOnboarded] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
 
-  // Add useEffect to set the student number from localStorage and check if already onboarded
+  // Get student number from localStorage (set during login)
   useEffect(() => {
-    const staffNumber = localStorage.getItem('staffNumber');
-    if (staffNumber) {
+    const studentNumber = 
+      localStorage.getItem('studentNumber') || 
+      sessionStorage.getItem('studentNumber') ||
+      (JSON.parse(localStorage.getItem('user') || '{}')).student_number;
+    
+    console.log('Retrieved student number:', studentNumber);
+
+    if (studentNumber) {
       setFormData(prev => ({
         ...prev,
-        studentNumber: staffNumber
+        studentNumber: studentNumber
       }));
       
+      // Store it in localStorage for consistency
+      localStorage.setItem('studentNumber', studentNumber);
+
       // Check if student is already onboarded
-      checkIfOnboarded(staffNumber);
+      checkIfOnboarded(studentNumber);
     } else {
       setIsChecking(false);
+      // If no student number found, redirect to login
+      navigate('/');
     }
-  }, []);
+  }, [navigate]);
 
   const checkIfOnboarded = async (studentNumber) => {
     try {
@@ -190,7 +201,7 @@ function OnboardingPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     try {
       // Get signature data
       const signatureData = getSignatureData();
@@ -287,17 +298,18 @@ function OnboardingPage() {
         <hr />
         <EightDigitDateInput label="Date:" name="date" value={formData.date} onChange={setFormData} />
 
-        <div>
-          <label>Student Number:</label>
-          <input 
-            name="studentNumber" 
-            value={formData.studentNumber} 
-            onChange={handleChange} 
-            required 
-            readOnly 
-            style={{ backgroundColor: '#f0f0f0' }}
-          />
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ fontWeight: 'bold', marginRight: '8px' }}>Student Number:</label>
+          <span style={{ 
+            padding: '8px', 
+            backgroundColor: '#f0f0f0', 
+            borderRadius: '4px',
+            fontWeight: 'bold'
+          }}>
+            {formData.studentNumber}
+          </span>
         </div>
+        
         <div>
           <label>Surname:</label>
           <input name="surname" value={formData.surname} onChange={handleChange} required />

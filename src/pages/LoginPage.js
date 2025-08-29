@@ -4,8 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import logo from '../assets/logo.png';
 
 const LoginPage = () => {
-  const [staffNumber, setStaffNumber] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [userType, setUserType] = useState('staff'); // 'staff' or 'student'
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
@@ -21,7 +22,7 @@ const LoginPage = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ staffNumber, password }),
+        body: JSON.stringify({ identifier, password, userType }),
       });
 
       const data = await response.json();
@@ -32,27 +33,38 @@ const LoginPage = () => {
 
       // Save user data to localStorage
       localStorage.setItem('user', JSON.stringify(data.user));
-      localStorage.setItem('role', data.user.role_name);
-      localStorage.setItem('staffNumber', staffNumber); // Store staff/student number
+      localStorage.setItem('role', data.user.role_name || 'student');
+      localStorage.setItem('userType', data.userType);
+      
+      // Store identifier based on user type
+      if (data.userType === 'staff') {
+        localStorage.setItem('staffNumber', identifier);
+        // Clear student number if it exists
+        localStorage.removeItem('studentNumber');
+      } else {
+        localStorage.setItem('studentNumber', identifier);
+        // Clear staff number if it exists
+        localStorage.removeItem('staffNumber');
+      }
 
-      // For patients, check if they've completed onboarding
-      if (data.user.role_name === 'patient') {
+      // For students, check if they've completed onboarding
+      if (data.userType === 'student') {
         try {
           const onboardingCheck = await fetch('http://localhost:5001/api/check-onboarding', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ studentNumber: staffNumber }),
+            body: JSON.stringify({ studentNumber: identifier }),
           });
           
           const onboardingData = await onboardingCheck.json();
           
           if (onboardingCheck.ok && onboardingData.exists) {
-            // Patient has completed onboarding, go to dashboard
+            // Student has completed onboarding, go to dashboard
             navigate('/patient-dashboard');
           } else {
-            // Patient needs to complete onboarding
+            // Student needs to complete onboarding
             navigate('/onboarding');
           }
         } catch (err) {
@@ -61,7 +73,7 @@ const LoginPage = () => {
           navigate('/onboarding');
         }
       } 
-      // Redirect based on role for non-patients
+      // Redirect based on role for staff
       else if (data.user.role_name === 'nurse') {
         navigate('/nurse-dashboard');
       } else if (data.user.role_name === 'admin' || data.user.role_name === 'receptionist') {
@@ -70,26 +82,59 @@ const LoginPage = () => {
         navigate('/patient-dashboard');
       }
     } catch (err) {
-      setError(err.message || 'Invalid student/staff number or password. Please try again.');
+      setError(err.message || 'Invalid credentials. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Clear any existing storage on component mount to prevent conflicts
+  React.useEffect(() => {
+    // Clear previous login data to avoid conflicts
+    localStorage.removeItem('staffNumber');
+    localStorage.removeItem('studentNumber');
+    localStorage.removeItem('user');
+    localStorage.removeItem('role');
+    localStorage.removeItem('userType');
+  }, []);
 
   return (
     <div className="login-container">
       <h2 className="login-title">Wits Booking</h2>
       <img src={logo} alt="Campus Health and Wellness Centre" className="login-logo" />
 
+      <div style={{ marginBottom: '15px' }}>
+        <label style={{ marginRight: '10px' }}>
+          <input
+            type="radio"
+            value="staff"
+            checked={userType === 'staff'}
+            onChange={(e) => setUserType(e.target.value)}
+          />
+          Staff Login
+        </label>
+        <label>
+          <input
+            type="radio"
+            value="student"
+            checked={userType === 'student'}
+            onChange={(e) => setUserType(e.target.value)}
+          />
+          Student Login
+        </label>
+      </div>
+
       <form onSubmit={handleLogin}>
-        <label className="login-label" htmlFor="staff/studentNumber">Student/Staff Number</label>
+        <label className="login-label" htmlFor="identifier">
+          {userType === 'staff' ? 'Staff Number' : 'Student Number'}
+        </label>
         <input
           type="text"
-          id="staff/studentNumber"
-          placeholder="Enter your student/staff number"
+          id="identifier"
+          placeholder={`Enter your ${userType === 'staff' ? 'staff' : 'student'} number`}
           className="login-input"
-          value={staffNumber}
-          onChange={(e) => setStaffNumber(e.target.value)}
+          value={identifier}
+          onChange={(e) => setIdentifier(e.target.value)}
           required
         />
 
@@ -97,7 +142,7 @@ const LoginPage = () => {
         <input
           type="password"
           id="password"
-          placeholder="Your Wits password"
+          placeholder="Your password"
           className="login-input"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -120,7 +165,7 @@ const LoginPage = () => {
       <div style={{ marginTop: 18, fontSize: 13, color: '#444' }}>
         <strong>Select forgot password to reset your login details:</strong>
         <ul style={{ marginTop: 6 }}>
-
+          {/* Password reset instructions */}
         </ul>
       </div>
     </div>

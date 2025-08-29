@@ -37,51 +37,96 @@ app.get('/', (req, res) => {
   res.send('Backend is working!');
 });
 
-// Login endpoint
+// Login endpoint - UPDATED to check both users and students tables
 app.post('/api/login', (req, res) => {
-  const { staffNumber, password } = req.body;
+  const { identifier, password, userType } = req.body;
   
-  if (!staffNumber || !password) {
-    return res.status(400).json({ error: 'Staff number and password are required' });
+  if (!identifier || !password || !userType) {
+    return res.status(400).json({ error: 'Identifier, password, and user type are required' });
   }
 
-  const sql = `
-    SELECT u.*, r.role_name 
-    FROM users u 
-    JOIN roles r ON u.role_id = r.id 
-    WHERE u.staff_number = ?
-  `;
-  
-  db.query(sql, [staffNumber], async (err, results) => {
-    if (err) {
-      console.error('Database error:', err);
-      return res.status(500).json({ error: 'Database error', details: err.message });
-    }
+  if (userType === 'staff') {
+    // Staff login (existing users table)
+    const sql = `
+      SELECT u.*, r.role_name 
+      FROM users u 
+      JOIN roles r ON u.role_id = r.id 
+      WHERE u.staff_number = ? OR u.username = ?
+    `;
     
-    if (results.length === 0) {
-      return res.status(401).json({ error: 'Invalid staff number or password' });
-    }
-    
-    const user = results[0];
-    
-    try {
-      const isMatch = await bcrypt.compare(password, user.password);
-      
-      if (!isMatch) {
-        return res.status(401).json({ error: 'Invalid staff number or password' });
+    db.query(sql, [identifier, identifier], async (err, results) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Database error', details: err.message });
       }
       
-      const { password: _, ...userWithoutPassword } = user;
+      if (results.length === 0) {
+        return res.status(401).json({ error: 'Invalid staff number/username or password' });
+      }
       
-      res.status(200).json({
-        message: 'Login successful',
-        user: userWithoutPassword
-      });
-    } catch (error) {
-      console.error('Error comparing passwords:', error);
-      res.status(500).json({ error: 'Server error' });
-    }
-  });
+      const user = results[0];
+      
+      try {
+        const isMatch = await bcrypt.compare(password, user.password);
+        
+        if (!isMatch) {
+          return res.status(401).json({ error: 'Invalid staff number/username or password' });
+        }
+        
+        const { password: _, ...userWithoutPassword } = user;
+        
+        res.status(200).json({
+          message: 'Login successful',
+          user: userWithoutPassword,
+          userType: 'staff'
+        });
+      } catch (error) {
+        console.error('Error comparing passwords:', error);
+        res.status(500).json({ error: 'Server error' });
+      }
+    });
+  } else if (userType === 'student') {
+    const sql = `
+      SELECT s.*, r.role_name 
+      FROM students s 
+      JOIN roles r ON s.role_id = r.id 
+      WHERE s.student_number = ? OR s.username = ?
+    `;
+    
+    db.query(sql, [identifier, identifier], async (err, results) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Database error', details: err.message });
+      }
+      
+      if (results.length === 0) {
+        return res.status(401).json({ error: 'Invalid student number/username or password' });
+      }
+      
+      const student = results[0];
+      
+      try {
+        const isMatch = await bcrypt.compare(password, student.password);
+        
+        if (!isMatch) {
+          return res.status(401).json({ error: 'Invalid student number/username or password' });
+        }
+        
+        const { password: _, ...studentWithoutPassword } = student;
+        
+        res.status(200).json({
+          message: 'Login successful',
+          user: studentWithoutPassword,
+          userType: 'student'
+        });
+      } catch (error) {
+        console.error('Error comparing passwords:', error);
+        res.status(500).json({ error: 'Server error' });
+      }
+    });
+  } else {
+    return res.status(400).json({ error: 'Invalid user type' });
+  }
 });
 
 // Check if student is already onboarded
@@ -106,7 +151,7 @@ app.post('/api/check-onboarding', (req, res) => {
 });
 });
 
-// Upload Proof of Registration endpoint with improved error handling
+// Upload Proof of Registration endpoint 
 app.post('/api/upload-por', (req, res) => {
 const { studentNumber, fileName, fileData } = req.body;
 
@@ -123,26 +168,6 @@ if (!fileName.toLowerCase().endsWith('.pdf')) {
   });
 }
 
-// First check if the por_uploads table exists
-const checkTableSql = `SELECT COUNT(*) as count FROM information_schema.tables 
-                      WHERE table_schema = 'chwc' AND table_name = 'por_uploads'`;
-
-db.query(checkTableSql, (err, results) => {
-  if (err) {
-    console.error('Error checking table existence:', err);
-    return res.status(500).json({ 
-      error: 'Database error',
-      details: 'Failed to check table existence: ' + err.message
-    });
-  }
-  
-  if (results[0].count === 0) {
-    return res.status(500).json({ 
-      error: 'Database table not found',
-      details: 'The por_uploads table does not exist. Please run the SQL setup.'
-    });
-  }
-  
   // Check if file already exists for this student
   const checkSql = 'SELECT id FROM por_uploads WHERE student_number = ?';
   
@@ -154,7 +179,6 @@ db.query(checkTableSql, (err, results) => {
         details: 'Failed to check existing records: ' + err.message
       });
     }
-    
     if (results.length > 0) {
       // Update existing record
       const updateSql = 'UPDATE por_uploads SET file_name = ?, file_data = ?, uploaded_at = NOW() WHERE student_number = ?';
@@ -194,112 +218,205 @@ db.query(checkTableSql, (err, results) => {
     }
   });
 });
+
+// Create appointments table if it doesn't exist
+app.post('/api/create-appointments-table', (req, res) => {
+  const createTableSql = `
+    CREATE TABLE IF NOT EXISTS appointments (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      reference_number VARCHAR(50) NOT NULL,
+      student_number VARCHAR(50) NOT NULL,
+      appointment_type VARCHAR(100) NOT NULL,
+      appointment_for VARCHAR(100) NOT NULL,
+      appointment_date DATE NULL,
+      appointment_time TIME NOT NULL,
+      previous_appointment_ref VARCHAR(50) NULL,
+      status VARCHAR(20) DEFAULT 'scheduled',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `;
+
+  db.query(createTableSql, (err, result) => {
+    if (err) {
+      console.error('Error creating appointments table:', err);
+      return res.status(500).json({ 
+        error: 'Failed to create appointments table',
+        details: err.message 
+      });
+    }
+    
+    res.status(200).json({ 
+      message: 'Appointments table created successfully or already exists',
+      result: result
+    });
+  });
 });
 
-// Save appointment to database
+// Save appointment to database - UPDATED to use student number
 app.post('/api/save-appointment', (req, res) => {
-const {
-  referenceNumber,
-  userId,
-  staffNumber,
-  appointmentType,
-  appointmentFor,
-  appointmentDate,
-  appointmentTime,
-  previousAppointmentRef
-} = req.body;
+  const {
+    referenceNumber,
+    studentNumber,
+    appointmentType,
+    appointmentFor,
+    appointmentDate,
+    appointmentTime,
+    previousAppointmentRef
+  } = req.body;
 
-if (!referenceNumber || !userId || !staffNumber || !appointmentType || !appointmentFor || !appointmentTime) {
-  return res.status(400).json({ 
-    error: 'Missing required fields' 
-  });
-}
+  console.log('Received appointment data:', req.body);
 
-const sql = `
-  INSERT INTO appointments (
-    reference_number, user_id, staff_number, appointment_type, 
-    appointment_for, appointment_date, appointment_time, previous_appointment_ref
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-`;
-
-const values = [
-  referenceNumber,
-  userId,
-  staffNumber,
-  appointmentType,
-  appointmentFor,
-  appointmentDate || null,
-  appointmentTime,
-  previousAppointmentRef || null
-];
-
-db.query(sql, values, (err, result) => {
-  if (err) {
-    console.error('Database error saving appointment:', err);
-    return res.status(500).json({ 
-      error: 'Failed to save appointment',
-      details: err.message 
+  if (!referenceNumber || !studentNumber || !appointmentType || !appointmentFor || !appointmentTime) {
+    return res.status(400).json({ 
+      error: 'Missing required fields',
+      details: `Missing: ${!referenceNumber ? 'referenceNumber, ' : ''}${!studentNumber ? 'studentNumber, ' : ''}${!appointmentType ? 'appointmentType, ' : ''}${!appointmentFor ? 'appointmentFor, ' : ''}${!appointmentTime ? 'appointmentTime' : ''}`
     });
   }
-  
-  res.status(200).json({ 
-    message: 'Appointment saved successfully!', 
-    appointmentId: result.insertId 
-  });
-});
-});
 
-// Get user appointments
-app.get('/api/user-appointments/:staffNumber', (req, res) => {
-const { staffNumber } = req.params;
+  const sql = `
+    INSERT INTO appointments (
+      reference_number, student_number, appointment_type, 
+      appointment_for, appointment_date, appointment_time, previous_appointment_ref
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+  `;
 
-const sql = `
-  SELECT a.*, u.full_name 
-  FROM appointments a
-  JOIN users u ON a.user_id = u.id
-  WHERE a.staff_number = ?
-  ORDER BY a.created_at DESC
-`;
+  const values = [
+    referenceNumber,
+    studentNumber,
+    appointmentType,
+    appointmentFor,
+    appointmentDate || null,
+    appointmentTime,
+    previousAppointmentRef || null
+  ];
 
-db.query(sql, [staffNumber], (err, results) => {
-  if (err) {
-    console.error('Database error fetching appointments:', err);
-    return res.status(500).json({ 
-      error: 'Failed to fetch appointments',
-      details: err.message 
+  console.log('Executing SQL with values:', values);
+
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error('Database error saving appointment:', err);
+      return res.status(500).json({ 
+        error: 'Failed to save appointment',
+        details: err.message,
+        sqlError: err
+      });
+    }
+    
+    res.status(200).json({ 
+      message: 'Appointment saved successfully!', 
+      appointmentId: result.insertId 
     });
-  }
-  
-  res.status(200).json({ 
-    appointments: results,
-    count: results.length
   });
 });
+
+// Get student appointments - FIXED to handle missing students table gracefully
+app.get('/api/student-appointments/:studentNumber', (req, res) => {
+  const { studentNumber } = req.params;
+
+  console.log('Fetching appointments for student:', studentNumber);
+
+  // First check if appointments table exists
+  const checkTableSql = `SHOW TABLES LIKE 'appointments'`;
+  
+  db.query(checkTableSql, (err, results) => {
+    if (err) {
+      console.error('Database error checking appointments table:', err);
+      return res.status(500).json({ 
+        error: 'Database error',
+        details: err.message 
+      });
+    }
+
+    if (results.length === 0) {
+      // Appointments table doesn't exist
+      return res.status(200).json({ 
+        appointments: [],
+        count: 0,
+        message: 'No appointments table found'
+      });
+    }
+
+    // Table exists, now fetch appointments
+    const sql = `
+      SELECT a.* 
+      FROM appointments a
+      WHERE a.student_number = ?
+      ORDER BY a.created_at DESC
+    `;
+
+    db.query(sql, [studentNumber], (err, results) => {
+      if (err) {
+        console.error('Database error fetching appointments:', err);
+        return res.status(500).json({ 
+          error: 'Failed to fetch appointments',
+          details: err.message 
+        });
+      }
+      
+      res.status(200).json({ 
+        appointments: results,
+        count: results.length
+      });
+    });
+  });
 });
 
 // Get all appointments (for admin/nurse view)
 app.get('/api/appointments', (req, res) => {
-const sql = `
-  SELECT a.*, u.full_name 
-  FROM appointments a
-  JOIN users u ON a.user_id = u.id
-  ORDER BY a.appointment_date DESC, a.appointment_time DESC
-`;
+  const sql = `
+    SELECT a.* 
+    FROM appointments a
+    ORDER BY a.appointment_date DESC, a.appointment_time DESC
+  `;
 
-db.query(sql, (err, results) => {
-  if (err) {
-    console.error('Database error fetching all appointments:', err);
-    return res.status(500).json({ 
-      error: 'Failed to fetch appointments',
-      details: err.message 
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error('Database error fetching all appointments:', err);
+      return res.status(500).json({ 
+        error: 'Failed to fetch appointments',
+        details: err.message 
+      });
+    }
+    
+    res.status(200).json({ 
+      appointments: results,
+      count: results.length
     });
-  }
-  
-  res.status(200).json({ 
-    appointments: results,
-    count: results.length
   });
 });
+
+// Create students table if it doesn't exist (matching users table structure)
+app.post('/api/create-students-table', (req, res) => {
+  const createTableSql = `
+    CREATE TABLE IF NOT EXISTS students (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      username VARCHAR(50) UNIQUE NOT NULL,
+      email VARCHAR(100) NOT NULL,
+      password VARCHAR(255) NOT NULL,
+      student_number VARCHAR(50) UNIQUE NOT NULL,
+      full_name VARCHAR(100) NOT NULL,
+      role_id INT NOT NULL DEFAULT 1,
+      is_active BOOLEAN DEFAULT TRUE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `;
+
+  db.query(createTableSql, (err, result) => {
+    if (err) {
+      console.error('Error creating students table:', err);
+      return res.status(500).json({ 
+        error: 'Failed to create students table',
+        details: err.message 
+      });
+    }
+    
+    res.status(200).json({ 
+      message: 'Students table created successfully or already exists',
+      result: result
+    });
+  });
 });
 
 // Password reset endpoint (for development)
@@ -427,122 +544,215 @@ db.query(createTableSql, (err, result) => {
 });
 });
 
-// Create appointments table if it doesn't exist (for development)
-app.post('/api/create-appointments-table', (req, res) => {
-const createTableSql = `
-  CREATE TABLE IF NOT EXISTS appointments (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    reference_number VARCHAR(50) NOT NULL UNIQUE,
-    user_id INT NOT NULL,
-    staff_number VARCHAR(50) NOT NULL,
-    appointment_type VARCHAR(100) NOT NULL,
-    appointment_for VARCHAR(100) NOT NULL,
-    appointment_date DATE,
-    appointment_time TIME NOT NULL,
-    previous_appointment_ref VARCHAR(50),
-    status ENUM('scheduled', 'completed', 'cancelled') DEFAULT 'scheduled',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-  )
-`;
+// Update appointments table to use student_number instead of user_id/staff_number
+app.post('/api/update-appointments-table', (req, res) => {
+  const alterTableSql = `
+    ALTER TABLE appointments 
+    DROP COLUMN IF EXISTS user_id,
+    DROP COLUMN IF EXISTS staff_number,
+    ADD COLUMN IF NOT EXISTS student_number VARCHAR(50) NOT NULL AFTER reference_number
+  `;
 
-db.query(createTableSql, (err, result) => {
-  if (err) {
-    console.error('Error creating appointments table:', err);
-    return res.status(500).json({ 
-      error: 'Failed to create appointments table',
-      details: err.message 
+  db.query(alterTableSql, (err, result) => {
+    if (err) {
+      console.error('Error updating appointments table:', err);
+      return res.status(500).json({ 
+        error: 'Failed to update appointments table',
+        details: err.message 
+      });
+    }
+    
+    res.status(200).json({ 
+      message: 'Appointments table updated successfully',
+      result: result
     });
-  }
-  
-  res.status(200).json({ 
-    message: 'Appointments table created successfully or already exists',
-    result: result
   });
-});
 });
 
 // API Endpoint: Save onboarding data
 app.post('/api/onboarding', (req, res) => {
-const formData = req.body;
+  const formData = req.body;
 
-const checkSql = 'SELECT id FROM onboarding_students WHERE student_number = ?';
+  const checkSql = 'SELECT id FROM onboarding_students WHERE student_number = ?';
 
-db.query(checkSql, [formData.studentNumber], (err, results) => {
-  if (err) {
-    console.error('Database error:', err);
-    return res.status(500).json({ 
-      error: 'Failed to check existing records',
-      details: err.message 
-    });
-  }
-  
-  if (results.length > 0) {
-    return res.status(409).json({ 
-      error: 'Student already exists in the system',
-      details: 'This student number has already completed the onboarding process'
-    });
-  }
-  
-  const insertSql = `
-    INSERT INTO onboarding_students (
-      student_number, surname, full_names, date_of_birth, gender, other_gender,
-      physical_address, postal_address, code, email, cell, alt_number,
-      emergency_name, emergency_relation, emergency_work_tel, emergency_cell,
-      medical_conditions, operations, conditions_details, disability, disability_details,
-      medication, medication_details, other_conditions, congenital, family_other,
-      smoking, recreation, psychological, psychological_details, date, signature_data
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `;
-
-  const values = [
-    formData.studentNumber,
-    formData.surname,
-    formData.fullNames,
-    formData.dateOfBirth,
-    formData.gender,
-    formData.otherGender || null,
-    formData.physicalAddress,
-    formData.postalAddress,
-    formData.code,
-    formData.email,
-    formData.cell,
-    formData.altNumber || null,
-    formData.emergencyName,
-    formData.emergencyRelation,
-    formData.emergencyWorkTel || null,
-    formData.emergencyCell,
-    formData.medicalConditions,
-    formData.operations,
-    formData.conditionsDetails || null,
-    formData.disability,
-    formData.disabilityDetails || null,
-    formData.medication,
-    formData.medicationDetails || null,
-    formData.otherConditions || null,
-    formData.congenital,
-    formData.familyOther || null,
-    formData.smoking,
-    formData.recreation,
-    formData.psychological,
-    formData.psychologicalDetails || null,
-    formData.date,
-    formData.signatureData || null
-  ];
-
-  db.query(insertSql, values, (err, result) => {
+  db.query(checkSql, [formData.studentNumber], (err, results) => {
     if (err) {
       console.error('Database error:', err);
       return res.status(500).json({ 
-        error: 'Failed to save data',
+        error: 'Failed to check existing records',
         details: err.message 
       });
     }
-    res.status(200).json({ 
-      message: 'Form submitted successfully!', 
-      recordId: result.insertId 
+    
+    if (results.length > 0) {
+      return res.status(409).json({ 
+        error: 'Student already exists in the system',
+        details: 'This student number has already completed the onboarding process'
       });
+    }
+    
+    const insertSql = `
+      INSERT INTO onboarding_students (
+        student_number, surname, full_names, date_of_birth, gender, other_gender,
+        physical_address, postal_address, code, email, cell, alt_number,
+        emergency_name, emergency_relation, emergency_work_tel, emergency_cell,
+        medical_conditions, operations, conditions_details, disability, disability_details,
+        medication, medication_details, other_conditions, congenital, family_other,
+        smoking, recreation, psychological, psychological_details, date, signature_data
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const values = [
+      formData.studentNumber,
+      formData.surname,
+      formData.fullNames,
+      formData.dateOfBirth,
+      formData.gender,
+      formData.otherGender || null,
+      formData.physicalAddress,
+      formData.postalAddress,
+      formData.code,
+      formData.email,
+      formData.cell,
+      formData.altNumber || null,
+      formData.emergencyName,
+      formData.emergencyRelation,
+      formData.emergencyWorkTel || null,
+      formData.emergencyCell,
+      formData.medicalConditions,
+      formData.operations,
+      formData.conditionsDetails || null,
+      formData.disability,
+      formData.disabilityDetails || null,
+      formData.medication,
+      formData.medicationDetails || null,
+      formData.otherConditions || null,
+      formData.congenital,
+      formData.familyOther || null,
+      formData.smoking,
+      formData.recreation,
+      formData.psychological,
+      formData.psychologicalDetails || null,
+      formData.date,
+      formData.signatureData || null
+    ];
+
+    db.query(insertSql, values, (err, result) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ 
+          error: 'Failed to save data',
+          details: err.message 
+        });
+      }
+      
+      res.status(200).json({ 
+        message: 'Form submitted successfully!', 
+        recordId: result.insertId 
+      });
+    });
+  });
+});
+
+// Create student account endpoint
+app.post('/api/create-student', async (req, res) => {
+  const { username, email, password, studentNumber, fullName, roleId = 1 } = req.body;
+  
+  if (!username || !email || !password || !studentNumber || !fullName) {
+    return res.status(400).json({ error: 'All fields are required' });
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    const sql = `
+      INSERT INTO students (username, email, password, student_number, full_name, role_id) 
+      VALUES (?, ?, ?, ?, ?, ?)
+    `;
+    
+    db.query(sql, [username, email, hashedPassword, studentNumber, fullName, roleId], (err, result) => {
+      if (err) {
+        console.error('Database error creating student:', err);
+        return res.status(500).json({ 
+          error: 'Failed to create student account',
+          details: err.message 
+        });
+      }
+      
+      res.status(200).json({ 
+        message: 'Student account created successfully!',
+        studentId: result.insertId 
+      });
+    });
+  } catch (error) {
+    console.error('Error hashing password:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Reset student password endpoint
+app.post('/api/reset-student-password', async (req, res) => {
+  const { studentNumber, newPassword } = req.body;
+  
+  if (!studentNumber || !newPassword) {
+    return res.status(400).json({ error: 'Student number and new password are required' });
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    
+    const sql = `
+      UPDATE students 
+      SET password = ? 
+      WHERE student_number = ?
+    `;
+    
+    db.query(sql, [hashedPassword, studentNumber], (err, result) => {
+      if (err) {
+        console.error('Database error resetting password:', err);
+        return res.status(500).json({ 
+          error: 'Failed to reset password',
+          details: err.message 
+        });
+      }
+      
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ 
+          error: 'Student not found',
+          details: 'No student found with the provided student number'
+        });
+      }
+      
+      res.status(200).json({ 
+        message: 'Password reset successfully!'
+      });
+    });
+  } catch (error) {
+    console.error('Error hashing password:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get all students
+app.get('/api/students', (req, res) => {
+  const sql = `
+    SELECT s.*
+    FROM students s 
+    ORDER BY s.id
+  `;
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error('Database error fetching students:', err);
+      return res.status(500).json({ 
+        error: 'Failed to fetch students',
+        details: err.message 
+      });
+    }
+    
+    res.status(200).json({ 
+      students: results,
+      count: results.length
     });
   });
 });
@@ -660,6 +870,7 @@ app.post('/api/create-staff-schedule-table', (req, res) => {
     });
   });
 });
+
 // Create emergency_onboarding table if it doesn't exist
 app.post('/api/create-emergency-table', (req, res) => {
   const createTableSql = `
@@ -805,7 +1016,7 @@ app.post('/api/emergency-onboarding', (req, res) => {
     formData.otherTransport || false,
     formData.otherTransportDetail || null,
     formData.arrivalTime,
-    formData.studentNumber, // This was likely missing
+    formData.studentNumber,
     formData.patientName,
     formData.patientSurname,
     formData.primaryAssessment,
@@ -828,8 +1039,8 @@ app.post('/api/emergency-onboarding', (req, res) => {
     formData.dischargeTime
   ];
 
-  console.log('SQL values count:', values.length); // Debug log
-  console.log('Values:', values); // Debug log
+  console.log('SQL values count:', values.length);
+  console.log('Values:', values);
 
   db.query(sql, values, (err, result) => {
     if (err) {
@@ -1017,6 +1228,7 @@ app.delete('/api/emergency-report/:id', (req, res) => {
     });
   });
 });
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Server error:', err);
@@ -1027,19 +1239,24 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`Backend running on http://localhost:${PORT}`);
   console.log(`Available endpoints:`);
-  console.log(`- POST /api/login`);
+  console.log(`- POST /api/login (UPDATED for student login)`);
   console.log(`- POST /api/check-onboarding`);
   console.log(`- POST /api/upload-por`);
-  console.log(`- POST /api/save-appointment`);
-  console.log(`- GET /api/user-appointments/:staffNumber`);
-  console.log(`- GET /api/appointments`);
+  console.log(`- POST /api/save-appointment (UPDATED for student number)`);
+  console.log(`- GET /api/student-appointments/:studentNumber (FIXED)`);
+  console.log(`- GET /api/appointments (UPDATED for student number)`);
   console.log(`- POST /api/reset-passwords (for development)`);
   console.log(`- POST /api/debug-user`);
   console.log(`- GET /api/users`);
+  console.log(`- GET /api/students (NEW)`);
   console.log(`- GET /api/por-uploads`);
   console.log(`- POST /api/create-por-table (for development)`);
-  console.log(`- POST /api/create-appointments-table (for development)`);
+  console.log(`- POST /api/create-appointments-table (NEW - for development)`);
+  console.log(`- POST /api/create-students-table (NEW)`);
+  console.log(`- POST /api/update-appointments-table (NEW)`);
   console.log(`- POST /api/onboarding`);
+  console.log(`- POST /api/create-student (NEW)`);
+  console.log(`- POST /api/reset-student-password (NEW)`);
   console.log(`- POST /api/save-staff-schedule`);
   console.log(`- GET /api/today-staff-schedule`);
   console.log(`- POST /api/create-emergency-table (for development)`);

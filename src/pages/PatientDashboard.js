@@ -3,39 +3,40 @@ import { useNavigate } from "react-router-dom";
 
 const PatientDashboard = () => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const staffNumber = localStorage.getItem("staffNumber");
+  const studentNumber = localStorage.getItem("studentNumber");
   const navigate = useNavigate();
-  const [appointments, setAppointments] = useState([]);
+  const [appointmentCount, setAppointmentCount] = useState(0);
 
   // Get progress from localStorage (default all)
   const progress = JSON.parse(localStorage.getItem("patientProgress") || "{}");
 
   useEffect(() => {
-    // Fetch user appointments when component mounts
-    const fetchAppointments = async () => {
+    // Fetch appointment count only
+    const fetchAppointmentCount = async () => {
       try {
-        const response = await fetch(`http://localhost:5001/api/user-appointments/${staffNumber}`);
+        const response = await fetch(`http://localhost:5001/api/student-appointments/${studentNumber}`);
         const data = await response.json();
         
         if (response.ok) {
-          setAppointments(data.appointments);
+          setAppointmentCount(data.appointments.length);
         } else {
-          console.error('Failed to fetch appointments:', data.error);
+          console.error('Failed to fetch appointment count:', data.error);
         }
       } catch (error) {
-        console.error('Error fetching appointments:', error);
+        console.error('Error fetching appointment count:', error);
       }
     };
 
-    if (staffNumber) {
-      fetchAppointments();
+    if (studentNumber) {
+      fetchAppointmentCount();
     }
-  }, [staffNumber]);
+  }, [studentNumber]);
 
   const logout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("role");
-    localStorage.removeItem("staffNumber");
+    localStorage.removeItem("studentNumber");
+    localStorage.removeItem("userType");
     localStorage.removeItem("patientProgress");
     navigate("/");
   };
@@ -67,7 +68,7 @@ const PatientDashboard = () => {
   return (
     <div style={{ padding: 24, fontFamily: 'Arial, sans-serif', maxWidth: 800, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h1 style={{ color: '#2c3e50', margin: 0 }}>Welcome, {user?.name || "Patient"}</h1>
+        <h1 style={{ color: '#2c3e50', margin: 0 }}>Welcome, {user?.full_name || "Student"}</h1>
         <button 
           onClick={logout}
           style={{
@@ -152,7 +153,7 @@ const PatientDashboard = () => {
           <div>
             <h3 style={{ color: '#2c3e50', margin: 0 }}>Appointments</h3>
             <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#3498db', margin: '5px 0' }}>
-              {appointments.length}
+              {appointmentCount}
             </p>
             <p style={{ margin: 0, color: '#7f8c8d' }}>Total appointments</p>
           </div>

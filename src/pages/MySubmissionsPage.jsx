@@ -6,19 +6,19 @@ const MySubmissionsPage = () => {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const staffNumber = localStorage.getItem('staffNumber');
+  const studentNumber = localStorage.getItem('studentNumber');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   useEffect(() => {
     const fetchAppointments = async () => {
       try {
-        if (!staffNumber) {
-          setError('No staff/student number found. Please log in again.');
+        if (!studentNumber) {
+          setError('No student number found. Please log in again.');
           setLoading(false);
           return;
         }
 
-        const response = await fetch(`http://localhost:5001/api/user-appointments/${staffNumber}`);
+        const response = await fetch(`http://localhost:5001/api/student-appointments/${studentNumber}`);
         const data = await response.json();
         
         if (response.ok) {
@@ -35,7 +35,7 @@ const MySubmissionsPage = () => {
     };
 
     fetchAppointments();
-  }, [staffNumber]);
+  }, [studentNumber]);
 
   const handleExit = () => {
     navigate('/patient-dashboard');
@@ -62,30 +62,36 @@ const MySubmissionsPage = () => {
   };
 
   const getStatusBadge = (status, appointmentDate) => {
-    let statusConfig;
+    let statusClass, statusText;
     
     if (status === 'cancelled') {
-      statusConfig = { color: 'bg-red-100 text-red-800', text: 'Cancelled' };
+      statusClass = 'status-cancelled';
+      statusText = 'Cancelled';
     } else if (status === 'completed') {
-      statusConfig = { color: 'bg-green-100 text-green-800', text: 'Completed' };
+      statusClass = 'status-completed';
+      statusText = 'Completed';
     } else if (appointmentDate) {
       const today = new Date();
       const appointment = new Date(appointmentDate);
       
       if (appointment.toDateString() === today.toDateString()) {
-        statusConfig = { color: 'bg-orange-100 text-orange-800', text: 'Today' };
+        statusClass = 'status-today';
+        statusText = 'Today';
       } else if (appointment < today) {
-        statusConfig = { color: 'bg-gray-100 text-gray-800', text: 'Past' };
+        statusClass = 'status-past';
+        statusText = 'Past';
       } else {
-        statusConfig = { color: 'bg-blue-100 text-blue-800', text: 'Upcoming' };
+        statusClass = 'status-upcoming';
+        statusText = 'Upcoming';
       }
     } else {
-      statusConfig = { color: 'bg-gray-100 text-gray-800', text: 'Scheduled' };
+      statusClass = 'status-scheduled';
+      statusText = 'Scheduled';
     }
     
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusConfig.color}`}>
-        {statusConfig.text}
+      <span className={`status-badge ${statusClass}`}>
+        {statusText}
       </span>
     );
   };
@@ -104,113 +110,110 @@ const MySubmissionsPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading your appointments...</p>
-        </div>
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>Loading your appointments...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="submissions-container">
+      <div className="submissions-content">
         {/* Header */}
-        <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-3xl font-bold text-blue-900">My Appointments & Submissions</h2>
-            <button
-              onClick={handleExit}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-semibold"
-            >
+        <div className="submissions-header">
+          <div className="header-content">
+            <h1>My Appointments</h1>
+            <button onClick={handleExit} className="back-button">
               BACK TO DASHBOARD
             </button>
           </div>
-          <p className="text-gray-700">
-            Welcome, {user?.name || 'Patient'}. Here are all your scheduled appointments and submissions with the Campus Health and Wellness Centre.
+          <p className="welcome-text">
+            Welcome, {user?.full_name || 'Student'}. Here are all your scheduled appointments.
           </p>
         </div>
 
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+          <div className="error-message">
             {error}
           </div>
         )}
 
         {/* Stats Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white p-4 rounded-lg shadow text-center">
-            <div className="text-2xl font-bold text-blue-600">{appointments.length}</div>
-            <div className="text-sm text-gray-600">Total Appointments</div>
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-number">{appointments.length}</div>
+            <div className="stat-label">Total Appointments</div>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow text-center">
-            <div className="text-2xl font-bold text-green-600">
+          <div className="stat-card">
+            <div className="stat-number">
               {appointments.filter(a => a.status === 'completed' || (a.appointment_date && new Date(a.appointment_date) < new Date())).length}
             </div>
-            <div className="text-sm text-gray-600">Completed</div>
+            <div className="stat-label">Completed</div>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow text-center">
-            <div className="text-2xl font-bold text-orange-600">
+          <div className="stat-card">
+            <div className="stat-number">
               {appointments.filter(a => 
                 a.status === 'scheduled' && 
                 a.appointment_date && 
                 new Date(a.appointment_date).toDateString() === new Date().toDateString()
               ).length}
             </div>
-            <div className="text-sm text-gray-600">Today</div>
+            <div className="stat-label">Today</div>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow text-center">
-            <div className="text-2xl font-bold text-blue-600">
+          <div className="stat-card">
+            <div className="stat-number">
               {appointments.filter(a => 
                 a.status === 'scheduled' && 
                 a.appointment_date && 
                 new Date(a.appointment_date) > new Date()
               ).length}
             </div>
-            <div className="text-sm text-gray-600">Upcoming</div>
+            <div className="stat-label">Upcoming</div>
           </div>
         </div>
 
         {appointments.length > 0 ? (
-          <div className="bg-white shadow-lg rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
-                <thead className="bg-gray-100">
+          <div className="appointments-card">
+            <div className="appointments-header">
+              <h2>Your Appointments</h2>
+            </div>
+            <div className="appointments-table">
+              <table>
+                <thead>
                   <tr>
-                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Appointment</th>
-                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
-                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
-                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
+                    <th>Appointment</th>
+                    <th>Details</th>
+                    <th>Date & Time</th>
+                    <th>Status</th>
+                    <th>Reference</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody>
                   {appointments.map((appointment) => (
-                    <tr key={appointment.id} className="hover:bg-gray-50">
-                      <td className="py-4 px-4">
-                        <div className="flex items-center">
-                          <span className="text-2xl mr-3">{getAppointmentTypeIcon(appointment.appointment_for)}</span>
-                          <div>
-                            <div className="font-medium text-gray-900">{appointment.appointment_for}</div>
-                            <div className="text-sm text-gray-500">{appointment.appointment_type}</div>
+                    <tr key={appointment.id} className="appointment-row">
+                      <td>
+                        <div className="appointment-type">
+                          <span className="appointment-icon">{getAppointmentTypeIcon(appointment.appointment_for)}</span>
+                          <div className="appointment-details">
+                            <div className="appointment-service">{appointment.appointment_for}</div>
+                            <div className="appointment-category">{appointment.appointment_type}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-4">
-                        <div className="text-sm text-gray-900">Booked by: {appointment.full_name}</div>
-                        <div className="text-sm text-gray-500">Staff #: {appointment.staff_number}</div>
+                      <td>
+                        <div className="appointment-info">Student #: {appointment.student_number}</div>
                       </td>
-                      <td className="py-4 px-4">
-                        <div className="text-sm font-medium text-gray-900">{formatDate(appointment.appointment_date)}</div>
-                        <div className="text-sm text-gray-500">{formatTime(appointment.appointment_time)}</div>
+                      <td>
+                        <div className="appointment-date">{formatDate(appointment.appointment_date)}</div>
+                        <div className="appointment-time">{formatTime(appointment.appointment_time)}</div>
                       </td>
-                      <td className="py-4 px-4">
+                      <td>
                         {getStatusBadge(appointment.status, appointment.appointment_date)}
                       </td>
-                      <td className="py-4 px-4">
-                        <span className="font-mono text-blue-600 text-sm">{appointment.reference_number}</span>
-                        <div className="text-xs text-gray-500 mt-1">
+                      <td>
+                        <div className="reference-number">{appointment.reference_number}</div>
+                        <div className="created-date">
                           Created: {new Date(appointment.created_at).toLocaleDateString()}
                         </div>
                       </td>
@@ -221,17 +224,13 @@ const MySubmissionsPage = () => {
             </div>
           </div>
         ) : (
-          <div className="bg-white shadow-lg rounded-lg p-8 text-center">
-            <div className="text-gray-400 mb-4">
-              <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-              </svg>
-            </div>
-            <p className="text-gray-500 text-lg mb-2">You don't have any appointments yet.</p>
-            <p className="text-gray-400 mb-6">Book your first appointment to get started with our services.</p>
+          <div className="empty-state">
+            <div className="empty-icon">📅</div>
+            <h3>You don't have any appointments yet.</h3>
+            <p>Book your first appointment to get started with our services.</p>
             <button
               onClick={() => navigate('/booking')}
-              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded font-semibold shadow"
+              className="book-button"
             >
               BOOK YOUR FIRST APPOINTMENT
             </button>
@@ -239,25 +238,368 @@ const MySubmissionsPage = () => {
         )}
 
         {/* Action Buttons */}
-        <div className="text-center mt-8 space-x-4">
-          <button
-            onClick={handleExit}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded font-semibold shadow"
-          >
+        <div className="action-buttons">
+          <button onClick={handleExit} className="action-button secondary">
             BACK TO DASHBOARD
           </button>
-          <button
-            onClick={() => navigate('/booking')}
-            className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded font-semibold shadow"
-          >
+          <button onClick={() => navigate('/booking')} className="action-button primary">
             BOOK NEW APPOINTMENT
           </button>
         </div>
 
-        <footer className="mt-6 text-sm text-gray-400 text-center">
+        <footer className="page-footer">
           © 2025 Wits University - Campus Health and Wellness Centre
         </footer>
       </div>
+      
+      <style jsx>{`
+        .submissions-container {
+          min-height: 100vh;
+          background-color: #f8fafc;
+          padding: 24px;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        }
+        
+        .submissions-content {
+          max-width: 1200px;
+          margin: 0 auto;
+        }
+        
+        .submissions-header {
+          background: white;
+          border-radius: 12px;
+          padding: 24px;
+          margin-bottom: 24px;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+        
+        .header-content {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+        }
+        
+        h1 {
+          font-size: 24px;
+          font-weight: 600;
+          color: #0f2b5b;
+          margin: 0;
+        }
+        
+        .welcome-text {
+          color: #64748b;
+          margin: 0;
+          font-size: 16px;
+        }
+        
+        .back-button {
+          padding: 10px 16px;
+          background: #0f2b5b;
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-weight: 500;
+          cursor: pointer;
+          font-size: 14px;
+        }
+        
+        .back-button:hover {
+          background: #1e40af;
+        }
+        
+        .error-message {
+          background: #fee2e2;
+          color: #b91c1c;
+          padding: 12px 16px;
+          border-radius: 8px;
+          margin-bottom: 24px;
+        }
+        
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 16px;
+          margin-bottom: 24px;
+        }
+        
+        .stat-card {
+          background: white;
+          border-radius: 12px;
+          padding: 20px;
+          text-align: center;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+        
+        .stat-number {
+          font-size: 32px;
+          font-weight: 700;
+          margin-bottom: 8px;
+          color: #0f2b5b;
+        }
+        
+        .stat-label {
+          color: #64748b;
+          font-size: 14px;
+        }
+        
+        .appointments-card {
+          background: white;
+          border-radius: 12px;
+          padding: 24px;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+          margin-bottom: 24px;
+        }
+        
+        .appointments-header {
+          margin-bottom: 20px;
+        }
+        
+        .appointments-header h2 {
+          font-size: 20px;
+          font-weight: 600;
+          color: #0f2b5b;
+          margin: 0;
+        }
+        
+        .appointments-table {
+          overflow-x: auto;
+        }
+        
+        table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        
+        th {
+          text-align: left;
+          padding: 12px 16px;
+          font-weight: 500;
+          color: #64748b;
+          border-bottom: 1px solid #e2e8f0;
+          font-size: 14px;
+        }
+        
+        td {
+          padding: 16px;
+          border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .appointment-row:hover {
+          background: #f8fafc;
+        }
+        
+        .appointment-type {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        
+        .appointment-icon {
+          font-size: 20px;
+        }
+        
+        .appointment-service {
+          font-weight: 500;
+          color: #0f2b5b;
+        }
+        
+        .appointment-category {
+          font-size: 14px;
+          color: #64748b;
+        }
+        
+        .appointment-info, .appointment-date, .appointment-time, .reference-number, .created-date {
+          font-size: 14px;
+        }
+        
+        .appointment-date {
+          font-weight: 500;
+          color: #0f2b5b;
+        }
+        
+        .appointment-time {
+          color: #64748b;
+        }
+        
+        .reference-number {
+          font-family: monospace;
+          color: #0f2b5b;
+          font-weight: 500;
+        }
+        
+        .created-date {
+          color: #64748b;
+          font-size: 12px;
+          margin-top: 4px;
+        }
+        
+        .status-badge {
+          padding: 6px 12px;
+          border-radius: 20px;
+          font-size: 12px;
+          font-weight: 500;
+          display: inline-block;
+        }
+        
+        .status-upcoming {
+          background: #dbeafe;
+          color: #1e40af;
+        }
+        
+        .status-today {
+          background: #ffedd5;
+          color: #ea580c;
+        }
+        
+        .status-completed {
+          background: #dcfce7;
+          color: #16a34a;
+        }
+        
+        .status-past {
+          background: #f3f4f6;
+          color: #6b7280;
+        }
+        
+        .status-cancelled {
+          background: #fee2e2;
+          color: #b91c1c;
+        }
+        
+        .status-scheduled {
+          background: #e0e7ff;
+          color: #4338ca;
+        }
+        
+        .empty-state {
+          background: white;
+          border-radius: 12px;
+          padding: 60px 20px;
+          text-align: center;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+          margin-bottom: 24px;
+        }
+        
+        .empty-icon {
+          font-size: 64px;
+          margin-bottom: 16px;
+          opacity: 0.5;
+        }
+        
+        .empty-state h3 {
+          font-size: 20px;
+          color: #64748b;
+          margin-bottom: 8px;
+        }
+        
+        .empty-state p {
+          color: #94a3b8;
+          margin-bottom: 24px;
+        }
+        
+        .book-button {
+          padding: 12px 24px;
+          background: #16a34a;
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-weight: 500;
+          cursor: pointer;
+        }
+        
+        .book-button:hover {
+          background: #15803d;
+        }
+        
+        .action-buttons {
+          display: flex;
+          justify-content: center;
+          gap: 12px;
+          margin-top: 24px;
+        }
+        
+        .action-button {
+          padding: 12px 24px;
+          border-radius: 8px;
+          font-weight: 500;
+          cursor: pointer;
+          border: none;
+        }
+        
+        .action-button.primary {
+          background: #0f2b5b;
+          color: white;
+        }
+        
+        .action-button.primary:hover {
+          background: #1e40af;
+        }
+        
+        .action-button.secondary {
+          background: #e2e8f0;
+          color: #475569;
+        }
+        
+        .action-button.secondary:hover {
+          background: #cbd5e1;
+        }
+        
+        .page-footer {
+          text-align: center;
+          color: #94a3b8;
+          font-size: 14px;
+          margin-top: 40px;
+        }
+        
+        .loading-container {
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          background-color: #f8fafc;
+        }
+        
+        .loading-spinner {
+          width: 40px;
+          height: 40px;
+          border: 4px solid #e2e8f0;
+          border-top: 4px solid #0f2b5b;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+          margin-bottom: 16px;
+        }
+        
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        
+        @media (max-width: 768px) {
+          .submissions-container {
+            padding: 16px;
+          }
+          
+          .header-content {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 16px;
+          }
+          
+          .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+          
+          th, td {
+            padding: 12px 8px;
+          }
+          
+          .action-buttons {
+            flex-direction: column;
+          }
+        }
+      `}</style>
     </div>
   );
 };

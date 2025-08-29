@@ -6,8 +6,8 @@ function FollowUpBooking() {
   const [followUpFor, setFollowUpFor] = useState("");
   const [appointmentDate, setAppointmentDate] = useState("");
   const [appointmentTime, setAppointmentTime] = useState("");
-
   const navigate = useNavigate();
+  const studentNumber = localStorage.getItem('studentNumber');
 
   const previousAppointments = [
     "CHWCS9299101975",
@@ -28,12 +28,18 @@ function FollowUpBooking() {
 
   const handleNext = () => {
     if (selectedPreviousAppointment && followUpFor && appointmentDate && appointmentTime) {
+      if (!studentNumber) {
+        alert("Student number not found. Please log in again.");
+        return;
+      }
+
       navigate("/confirm-follow-up", {
         state: {
           previousAppointment: selectedPreviousAppointment,
           followUpFor,
           appointmentDate,
-          appointmentTime
+          appointmentTime,
+          studentNumber: studentNumber
         }
       });
     } else {

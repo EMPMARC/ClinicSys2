@@ -6,6 +6,7 @@ function HealthAndWellnessPage() {
   const [appointmentDate, setAppointmentDate] = useState("");
   const [appointmentTime, setAppointmentTime] = useState("");
   const navigate = useNavigate();
+  const studentNumber = localStorage.getItem('studentNumber');
 
   const services = [
     "General Consultation",
@@ -31,11 +32,17 @@ function HealthAndWellnessPage() {
       return;
     }
 
+    if (!studentNumber) {
+      alert("Student number not found. Please log in again.");
+      return;
+    }
+
     navigate("/confirm-booking", {
       state: {
         service: selectedService,
         date: appointmentDate,
         time: appointmentTime,
+        studentNumber: studentNumber
       },
     });
   };
