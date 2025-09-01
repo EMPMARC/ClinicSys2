@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 import React, { useState, useEffect } from "react";
-=======
-import React, { useState } from "react";
->>>>>>> a118ad8ca2335672b7eac97b7da45893d0ae689f
 import { useNavigate } from "react-router-dom";
 
 function FollowUpBooking() {
@@ -10,7 +6,6 @@ function FollowUpBooking() {
   const [followUpFor, setFollowUpFor] = useState("");
   const [appointmentDate, setAppointmentDate] = useState("");
   const [appointmentTime, setAppointmentTime] = useState("");
-<<<<<<< HEAD
   const [previousAppointments, setPreviousAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -48,16 +43,6 @@ function FollowUpBooking() {
 
     fetchPreviousAppointments();
   }, [studentNumber]);
-=======
-  const navigate = useNavigate();
-  const studentNumber = localStorage.getItem('studentNumber');
-
-  const previousAppointments = [
-    "CHWCS9299101975",
-    "CHWCS7361204643",
-    "CHWCS1018443315"
-  ];
->>>>>>> a118ad8ca2335672b7eac97b7da45893d0ae689f
 
   const appointmentTypes = [
     "HIV Testing Follow-Up",
@@ -99,7 +84,6 @@ function FollowUpBooking() {
     }
   };
 
-<<<<<<< HEAD
   const handleDiscard = () => {
     const confirmDiscard = window.confirm("Are you sure you want to discard this appointment?");
     if (confirmDiscard) {
@@ -253,101 +237,12 @@ function FollowUpBooking() {
           style={discardButtonStyle}
         >
           DISCARD THIS APPOINTMENT
-=======
-  return (
-    <div style={{ maxWidth: "500px", margin: "0 auto", padding: "20px", fontFamily: "Arial" }}>
-      <h1>Follow-Up Booking</h1>
-      <p><strong>Ref:</strong> WITS-0535369819</p>
-      <hr />
-
-      <h2>Appointment Type</h2>
-      <p><strong>Important:</strong></p>
-      <p style={{ fontStyle: "italic" }}>
-        Please note that you need to book previous appointments before booking for a follow-up.
-      </p>
-
-      <label><strong>Select Previous Appointment *</strong></label>
-      <p style={{ fontSize: "12px", color: "#555" }}>
-        If the previous appointments are empty, you will not be able to proceed.
-        You need to book an appointment before booking for a follow-up.
-      </p>
-      <select
-        value={selectedPreviousAppointment}
-        onChange={(e) => setSelectedPreviousAppointment(e.target.value)}
-        style={{ width: "100%", padding: "8px", marginBottom: "15px" }}
-      >
-        <option value="">Select previous appointment</option>
-        {previousAppointments.map(ref => (
-          <option key={ref} value={ref}>{ref}</option>
-        ))}
-      </select>
-
-      <label><strong>Follow-Up Appointment For *</strong></label>
-      <select
-        value={followUpFor}
-        onChange={(e) => setFollowUpFor(e.target.value)}
-        style={{ width: "100%", padding: "8px", marginBottom: "15px" }}
-      >
-        <option value="">Select follow-up type</option>
-        {appointmentTypes.map(type => (
-          <option key={type} value={type}>{type}</option>
-        ))}
-      </select>
-
-      <label><strong>Appointment Date *</strong></label>
-      <input
-        type="date"
-        value={appointmentDate}
-        onChange={(e) => setAppointmentDate(e.target.value)}
-        style={{ width: "100%", padding: "8px", marginBottom: "15px" }}
-      />
-
-      <label><strong>Appointment Time *</strong></label>
-      <select
-        value={appointmentTime}
-        onChange={(e) => setAppointmentTime(e.target.value)}
-        style={{ width: "100%", padding: "8px", marginBottom: "20px" }}
-      >
-        <option value="">Select time</option>
-        {appointmentTimes.map(time => (
-          <option key={time} value={time}>{time}</option>
-        ))}
-      </select>
-
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <button
-          onClick={handleSave}
-          style={{
-            padding: "10px 20px",
-            border: "2px solid #28a745",
-            borderRadius: "8px",
-            background: "white",
-            color: "#28a745",
-            fontWeight: "bold"
-          }}
-        >
-          SAVE
-        </button>
-        <button
-          onClick={handleNext}
-          style={{
-            padding: "10px 20px",
-            border: "2px solid #3498db",
-            borderRadius: "8px",
-            background: "white",
-            color: "#3498db",
-            fontWeight: "bold"
-          }}
-        >
-          NEXT &gt;&gt;
->>>>>>> a118ad8ca2335672b7eac97b7da45893d0ae689f
         </button>
       </div>
     </div>
   );
 }
 
-<<<<<<< HEAD
 // Styles matching BookingPage design
 const containerStyle = {
   padding: "30px",
@@ -549,6 +444,4 @@ const errorStyle = {
   border: "1px solid #f5c6cb",
 };
 
-=======
->>>>>>> a118ad8ca2335672b7eac97b7da45893d0ae689f
 export default FollowUpBooking;

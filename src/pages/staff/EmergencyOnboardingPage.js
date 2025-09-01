@@ -18,7 +18,6 @@ const EmergencyOnboardingPage = () => {
     setIsSubmitting(true);
     setSubmitMessage("");
 
-<<<<<<< HEAD
     // Validate required fields
     const requiredFields = [
       'date', 'timeOfCall', 'personResponsible', 'callerName', 'department',
@@ -38,8 +37,6 @@ const EmergencyOnboardingPage = () => {
       return;
     }
 
-=======
->>>>>>> a118ad8ca2335672b7eac97b7da45893d0ae689f
     try {
       // Prepare the data for submission
       const submissionData = {
