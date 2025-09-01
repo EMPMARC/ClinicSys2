@@ -1646,6 +1646,48 @@ app.post('/api/report3', async (req, res) => {
   }
 });
 
+// API Endpoint: Get onboarding data for reports
+app.get('/api/onboarding-data', (req, res) => {
+  const { from, to, role } = req.query;
+  
+  let sql = `
+    SELECT 
+      id,
+      student_number as id,
+      CONCAT(surname, ', ', full_names) as name,
+      'Student' as role,
+      DATE_FORMAT(date, '%Y-%m-%d') as date
+    FROM onboarding_students
+    WHERE 1=1
+  `;
+  
+  const params = [];
+  
+  if (from) {
+    sql += ' AND DATE(date) >= ?';
+    params.push(from);
+  }
+  
+  if (to) {
+    sql += ' AND DATE(date) <= ?';
+    params.push(to);
+  }
+  
+  sql += ' ORDER BY date DESC';
+  
+  db.query(sql, params, (err, results) => {
+    if (err) {
+      console.error('Database error fetching onboarding data:', err);
+      return res.status(500).json({ 
+        error: 'Failed to fetch onboarding data',
+        details: err.message 
+      });
+    }
+    
+    res.status(200).json(results);
+  });
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Server error:', err);
@@ -1690,4 +1732,5 @@ app.listen(PORT, () => {
   console.log(`- POST /api/report1 (NEW - Appointments PDF Report)`);
   console.log(`- POST /api/report2 (NEW - Emergency PDF Report)`);
   console.log(`- POST /api/report3 (NEW - POR PDF Report)`);
+  console.log(`- GET /api/onboarding-data (NEW - New Registrations Report Data)`);
 });

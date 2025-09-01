@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import NewRegistrationsReport from './NewRegistrationsReport';
 
 const ReportsPage = () => {
   const [loading, setLoading] = useState({});
   const [error, setError] = useState({});
   const [success, setSuccess] = useState({});
+  const [activeReport, setActiveReport] = useState(null);
   const navigate = useNavigate();
 
   const generateReport = async (reportType) => {
@@ -53,6 +55,14 @@ const ReportsPage = () => {
     } finally {
       setLoading(prev => ({ ...prev, [reportType]: false }));
     }
+  };
+
+  const viewNewRegistrationsReport = () => {
+    setActiveReport('newRegistrations');
+  };
+
+  const backToReportsList = () => {
+    setActiveReport(null);
   };
 
   const containerStyle = {
@@ -146,73 +156,104 @@ const ReportsPage = () => {
 
   return (
     <div style={containerStyle}>
-      {/* Header */}
-      <div style={headerStyle}>
-        <h1>📊 CHWC Reports Dashboard</h1>
-        <p>Generate comprehensive reports for your campus health system</p>
-      </div>
-
-      {/* Reports Grid */}
-      <div style={reportsGridStyle}>
-        {/* Appointments Report */}
-        <div style={reportCardStyle}>
-          <div style={reportTitleStyle}>📅 Appointments Report</div>
-          <div style={reportDescriptionStyle}>
-            Monthly breakdown of appointments and emergency cases with detailed statistics and trends.
+      {activeReport === 'newRegistrations' ? (
+        // New Registrations Report View
+        <div>
+          <div style={headerStyle}>
+            <h1>📊 New Student Onboarding Report</h1>
+            <p>Interactive report showing new student registrations who completed the onboarding process</p>
           </div>
-          <button 
-            style={buttonStyle} 
-            onClick={() => generateReport('report1')}
-            disabled={loading.report1}
-          >
-            {loading.report1 ? 'Generating...' : 'Generate Report'}
+          <NewRegistrationsReport />
+          <button style={backButtonStyle} onClick={backToReportsList}>
+            ← Back to Reports List
           </button>
-          {loading.report1 && <div style={loadingStyle}>Generating report...</div>}
-          {error.report1 && <div style={errorStyle}>{error.report1}</div>}
-          {success.report1 && <div style={successStyle}>{success.report1}</div>}
         </div>
-
-        {/* Emergency Report */}
-        <div style={reportCardStyle}>
-          <div style={reportTitleStyle}>🚨 Emergency Report</div>
-          <div style={reportDescriptionStyle}>
-            Campus-wise emergency statistics showing distribution across Parktown and Main campuses.
+      ) : (
+        // Main Reports Dashboard
+        <>
+          {/* Header */}
+          <div style={headerStyle}>
+            <h1>📊 CHWC Reports Dashboard</h1>
+            <p>Generate comprehensive reports for your campus health system</p>
           </div>
-          <button 
-            style={buttonStyle} 
-            onClick={() => generateReport('report2')}
-            disabled={loading.report2}
-          >
-            {loading.report2 ? 'Generating...' : 'Generate Report'}
-          </button>
-          {loading.report2 && <div style={loadingStyle}>Generating report...</div>}
-          {error.report2 && <div style={errorStyle}>{error.report2}</div>}
-          {success.report2 && <div style={successStyle}>{success.report2}</div>}
-        </div>
 
-        {/* POR Report */}
-        <div style={reportCardStyle}>
-          <div style={reportTitleStyle}>📋 Proof of Registration Report</div>
-          <div style={reportDescriptionStyle}>
-            Monthly upload statistics for proof of registration documents submitted by students.
+          {/* Reports Grid */}
+          <div style={reportsGridStyle}>
+            {/* Appointments Report */}
+            <div style={reportCardStyle}>
+              <div style={reportTitleStyle}>📅 Appointments Report</div>
+              <div style={reportDescriptionStyle}>
+                Monthly breakdown of appointments and emergency cases with detailed statistics and trends.
+              </div>
+              <button 
+                style={buttonStyle} 
+                onClick={() => generateReport('report1')}
+                disabled={loading.report1}
+              >
+                {loading.report1 ? 'Generating...' : 'Generate Report'}
+              </button>
+              {loading.report1 && <div style={loadingStyle}>Generating report...</div>}
+              {error.report1 && <div style={errorStyle}>{error.report1}</div>}
+              {success.report1 && <div style={successStyle}>{success.report1}</div>}
+            </div>
+
+            {/* Emergency Report */}
+            <div style={reportCardStyle}>
+              <div style={reportTitleStyle}>🚨 Emergency Report</div>
+              <div style={reportDescriptionStyle}>
+                Campus-wise emergency statistics showing distribution across Parktown and Main campuses.
+              </div>
+              <button 
+                style={buttonStyle} 
+                onClick={() => generateReport('report2')}
+                disabled={loading.report2}
+              >
+                {loading.report2 ? 'Generating...' : 'Generate Report'}
+              </button>
+              {loading.report2 && <div style={loadingStyle}>Generating report...</div>}
+              {error.report2 && <div style={errorStyle}>{error.report2}</div>}
+              {success.report2 && <div style={successStyle}>{success.report2}</div>}
+            </div>
+
+            {/* POR Report */}
+            <div style={reportCardStyle}>
+              <div style={reportTitleStyle}>📋 Proof of Registration Report</div>
+              <div style={reportDescriptionStyle}>
+                Monthly upload statistics for proof of registration documents submitted by students.
+              </div>
+              <button 
+                style={buttonStyle} 
+                onClick={() => generateReport('report3')}
+                disabled={loading.report3}
+              >
+                {loading.report3 ? 'Generating...' : 'Generate Report'}
+              </button>
+              {loading.report3 && <div style={loadingStyle}>Generating report...</div>}
+              {error.report3 && <div style={errorStyle}>{error.report3}</div>}
+              {success.report3 && <div style={successStyle}>{success.report3}</div>}
+            </div>
+
+            {/* New Registrations Report */}
+            <div style={reportCardStyle}>
+              <div style={reportTitleStyle}>👥 New Student Onboarding Report</div>
+              <div style={reportDescriptionStyle}>
+                Interactive dashboard showing new student registrations who completed the onboarding process with charts, filters, and detailed breakdowns.
+              </div>
+              <button 
+                style={buttonStyle} 
+                onClick={viewNewRegistrationsReport}
+              >
+                View Report
+              </button>
+            </div>
           </div>
-          <button 
-            style={buttonStyle} 
-            onClick={() => generateReport('report3')}
-            disabled={loading.report3}
-          >
-            {loading.report3 ? 'Generating...' : 'Generate Report'}
-          </button>
-          {loading.report3 && <div style={loadingStyle}>Generating report...</div>}
-          {error.report3 && <div style={errorStyle}>{error.report3}</div>}
-          {success.report3 && <div style={successStyle}>{success.report3}</div>}
-        </div>
-      </div>
 
-      {/* Back Button */}
-      <button style={backButtonStyle} onClick={() => navigate('/admin-dashboard')}>
-        ← Back to Dashboard
-      </button>
+          {/* Back Button */}
+          <button style={backButtonStyle} onClick={() => navigate('/admin-dashboard')}>
+            ← Back to Dashboard
+          </button>
+        </>
+      )}
     </div>
   );
 };
