@@ -56,6 +56,7 @@ function HealthAndWellnessPage() {
     alert("Booking details saved successfully!");
   };
 
+<<<<<<< HEAD
   const handleDiscard = () => {
     const confirmDiscard = window.confirm("Are you sure you want to discard this appointment?");
     if (confirmDiscard) {
@@ -143,20 +144,119 @@ function HealthAndWellnessPage() {
           <button
             onClick={handleSave}
             style={secondaryButtonStyle}
+=======
+  return (
+    <div style={{ maxWidth: "500px", margin: "0 auto", padding: "20px", fontFamily: "Arial" }}>
+      <h1 style={{ color: "#2C3E50" }}>Health and Wellness Booking (Main Campus)</h1>
+      
+      <p><strong>Main Campus Health and Wellness Centre</strong></p>
+      <p>
+        Campus Health offers services such as: Primary Health care, Family Planning, Mental Health, Emergency Care, Dispensary, HCT (VCT), Wellness Programs, Private Medical Practitioner to staff, students and Wits community. 
+        Some of these services are free such as HIV testing, Counselling and Reproductive health.
+      </p>
+      <p>
+        <strong>SERVICE HOURS:</strong> Monday - Friday, 08:00 to 15:30<br />
+        <strong>FOLLOW-UP:</strong> Monday - Friday, 08:00 to 11:00
+      </p>
+      <p>
+        If you must <strong>cancel</strong> an appointment, we request for <strong>2 hours</strong> notice, in order to allow other bookings. <br />
+        <strong>Please note:</strong> General Consultations can <strong>only</strong> be booked daily on the day of consultation.
+      </p>
+
+      <div style={{ marginTop: "20px" }}>
+        <label><strong>Appointment for *</strong></label>
+        <select
+          value={selectedService}
+          onChange={(e) => setSelectedService(e.target.value)}
+          required
+          style={{ display: "block", width: "100%", padding: "8px", marginBottom: "15px" }}
+        >
+          <option value="">Select service</option>
+          {services.map((service) => (
+            <option key={service} value={service}>
+              {service}
+            </option>
+          ))}
+        </select>
+
+        {requiresDate.includes(selectedService) && (
+          <div style={{ marginBottom: "15px" }}>
+            <label><strong>Appointment Date *</strong></label>
+            <input
+              type="date"
+              value={appointmentDate}
+              onChange={(e) => setAppointmentDate(e.target.value)}
+              required
+              style={{ display: "block", width: "100%", padding: "8px" }}
+            />
+          </div>
+        )}
+
+        <label><strong>Appointment Time *</strong></label>
+        <select
+          value={appointmentTime}
+          onChange={(e) => setAppointmentTime(e.target.value)}
+          required
+          style={{ display: "block", width: "100%", padding: "8px", marginBottom: "20px" }}
+        >
+          <option value="">Select time</option>
+          {times.map((time) => (
+            <option key={time} value={time}>
+              {time}
+            </option>
+          ))}
+        </select>
+
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <button
+            onClick={handleSave}
+            style={{
+              padding: "10px 20px",
+              border: "2px solid #0d6efd",
+              borderRadius: "8px",
+              background: "white",
+              color: "#0d6efd",
+              fontWeight: "bold"
+            }}
+>>>>>>> a118ad8ca2335672b7eac97b7da45893d0ae689f
           >
             SAVE
           </button>
           <button
             onClick={handleNext}
+<<<<<<< HEAD
             style={primaryButtonStyle}
+=======
+            style={{
+              padding: "10px 20px",
+              border: "2px solid #0d6efd",
+              borderRadius: "8px",
+              background: "white",
+              color: "#0d6efd",
+              fontWeight: "bold"
+            }}
+>>>>>>> a118ad8ca2335672b7eac97b7da45893d0ae689f
           >
             NEXT &gt;&gt;
           </button>
         </div>
 
         <button
+<<<<<<< HEAD
           onClick={handleDiscard}
           style={discardButtonStyle}
+=======
+          style={{
+            marginTop: "20px",
+            width: "100%",
+            padding: "12px",
+            background: "#28a745",
+            border: "none",
+            color: "white",
+            borderRadius: "25px",
+            fontWeight: "bold"
+          }}
+>>>>>>> a118ad8ca2335672b7eac97b7da45893d0ae689f
         >
           DISCARD THIS APPOINTMENT
         </button>
@@ -165,6 +265,7 @@ function HealthAndWellnessPage() {
   );
 }
 
+<<<<<<< HEAD
 // Styles matching BookingPage design
 const containerStyle = {
   padding: "30px",
@@ -308,4 +409,6 @@ const discardButtonStyle = {
   width: "100%",
 };
 
+=======
+>>>>>>> a118ad8ca2335672b7eac97b7da45893d0ae689f
 export default HealthAndWellnessPage;

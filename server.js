@@ -546,6 +546,7 @@ app.get('/api/appointments', (req, res) => {
   });
 });
 
+<<<<<<< HEAD
 // Get appointments by student number (for modify booking page)
 app.get('/api/appointments/student/:studentNumber', (req, res) => {
   const { studentNumber } = req.params;
@@ -646,6 +647,8 @@ app.put('/api/appointments/:id/cancel', (req, res) => {
   });
 });
 
+=======
+>>>>>>> a118ad8ca2335672b7eac97b7da45893d0ae689f
 // Create students table if it doesn't exist (matching users table structure)
 app.post('/api/create-students-table', (req, res) => {
   const createTableSql = `
@@ -1244,7 +1247,11 @@ app.post('/api/emergency-onboarding', (req, res) => {
       intervention, medical_consent, transport_consent, signature, consent_date,
       pt_chwc_vehicle, pt_ambulance, pt_other, pt_other_detail,
       patient_transported_to, departure_time, chwc_arrival_time, existing_file,
+<<<<<<< HEAD
       referred, discharge_condition, discharge_time
+=======
+      referred, hospital_name, discharge_condition, discharge_time
+>>>>>>> a118ad8ca2335672b7eac97b7da45893d0ae689f
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
@@ -1291,13 +1298,20 @@ app.post('/api/emergency-onboarding', (req, res) => {
     formData.chwcArrivalTime,
     formData.existingFile,
     formData.referred,
+<<<<<<< HEAD
+=======
+    formData.hospitalName || null,
+>>>>>>> a118ad8ca2335672b7eac97b7da45893d0ae689f
     formData.dischargeCondition,
     formData.dischargeTime
   ];
 
   console.log('SQL values count:', values.length);
   console.log('Values:', values);
+<<<<<<< HEAD
   console.log('SQL:', sql);
+=======
+>>>>>>> a118ad8ca2335672b7eac97b7da45893d0ae689f
 
   db.query(sql, values, (err, result) => {
     if (err) {
@@ -1315,6 +1329,7 @@ app.post('/api/emergency-onboarding', (req, res) => {
   });
 });
 
+<<<<<<< HEAD
 // Get emergency table structure
 app.get('/api/emergency-table-structure', (req, res) => {
   const sql = 'DESCRIBE emergency_onboarding';
@@ -1336,6 +1351,9 @@ app.get('/api/emergency-table-structure', (req, res) => {
 });
 
 // ... existing code ...
+=======
+// Get all emergency reports
+>>>>>>> a118ad8ca2335672b7eac97b7da45893d0ae689f
 app.get('/api/emergency-reports', (req, res) => {
   const sql = `
     SELECT 
@@ -1523,9 +1541,12 @@ app.listen(PORT, () => {
   console.log(`- POST /api/save-appointment (UPDATED for student number)`);
   console.log(`- GET /api/student-appointments/:studentNumber (FIXED)`);
   console.log(`- GET /api/appointments (UPDATED for student number)`);
+<<<<<<< HEAD
   console.log(`- GET /api/appointments/student/:studentNumber (NEW - for modify booking)`);
   console.log(`- PUT /api/appointments/:id (NEW - update appointment)`);
   console.log(`- PUT /api/appointments/:id/cancel (NEW - cancel appointment)`);
+=======
+>>>>>>> a118ad8ca2335672b7eac97b7da45893d0ae689f
   console.log(`- POST /api/reset-passwords (for development)`);
   console.log(`- POST /api/debug-user`);
   console.log(`- GET /api/users`);

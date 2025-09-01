@@ -55,6 +55,7 @@ const ConfirmBooking = () => {
     navigate(-1);
   };
 
+<<<<<<< HEAD
   const handleDiscard = () => {
     const confirmDiscard = window.confirm("Are you sure you want to discard this appointment?");
     if (confirmDiscard) {
@@ -77,11 +78,25 @@ const ConfirmBooking = () => {
             Go Back to Booking
           </button>
         </div>
+=======
+  if (!state) {
+    return (
+      <div className="p-4 max-w-md mx-auto">
+        <h2 className="text-2xl font-bold mb-4">Error</h2>
+        <p>No appointment data found. Please start over.</p>
+        <button 
+          onClick={() => navigate('/booking')}
+          className="bg-blue-600 text-white px-4 py-2 rounded mt-4"
+        >
+          Go Back to Booking
+        </button>
+>>>>>>> a118ad8ca2335672b7eac97b7da45893d0ae689f
       </div>
     );
   }
 
   return (
+<<<<<<< HEAD
     <div style={containerStyle}>
       <h1 style={titleStyle}>Campus Health And Wellness Centre</h1>
       <div style={cardStyle}>
@@ -141,10 +156,49 @@ const ConfirmBooking = () => {
           Discard This Appointment
         </button>
       </div>
+=======
+    <div className="p-4 max-w-md mx-auto">
+      <h2 className="text-2xl font-bold mb-2">Health and Wellness Booking (Main Campus)</h2>
+      <p><strong>Ref:</strong> {reference}</p>
+
+      <h3 className="mt-4 font-semibold">Confirm Booking</h3>
+      <p className="text-sm mb-4">
+        Preview your submission<br />
+        <strong>Ref:</strong> {reference}
+      </p>
+
+      <div className="bg-blue-100 p-2 rounded mb-3">
+        Main Campus Health and Wellness Centre
+      </div>
+      <p><strong>Appointment for:</strong> {service}</p>
+      {date && <p><strong>Appointment Date:</strong> {date}</p>}
+      <p><strong>Appointment Time:</strong> {time}</p>
+      <p><strong>Student Number:</strong> {studentNumber}</p>
+
+      <div className="flex justify-between mt-4">
+        <button 
+          className="bg-gray-400 text-white px-4 py-2 rounded" 
+          onClick={handleBack}
+        >
+          &lt;&lt; Back
+        </button>
+        <button 
+          className="bg-blue-600 text-white px-4 py-2 rounded" 
+          onClick={handleSubmit}
+        >
+          Submit
+        </button>
+      </div>
+
+      <button className="bg-orange-500 text-white mt-4 px-4 py-2 w-full rounded">
+        Discard This Appointment
+      </button>
+>>>>>>> a118ad8ca2335672b7eac97b7da45893d0ae689f
     </div>
   );
 };
 
+<<<<<<< HEAD
 // Styles matching BookingPage design
 const containerStyle = {
   padding: "30px",
@@ -273,4 +327,6 @@ const errorTextStyle = {
   textAlign: "center",
 };
 
+=======
+>>>>>>> a118ad8ca2335672b7eac97b7da45893d0ae689f
 export default ConfirmBooking;
