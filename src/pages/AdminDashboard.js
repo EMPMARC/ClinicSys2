@@ -77,12 +77,10 @@ const AdminDashboard = () => {
           Approve Proof of Registration
         </button>
 
-        {/* Admin-only Reports Button */}
-        {user?.role === "admin" && (
-          <button style={buttonStyle} onClick={() => navigate("/new-report")}>
-            View Reports
-          </button>
-        )}
+        {/* Reports Button */}
+        <button style={buttonStyle} onClick={() => navigate("/new-report")}>
+          Generate Reports
+        </button>
       </div>
 
       {/* Logout */}

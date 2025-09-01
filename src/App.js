@@ -25,6 +25,7 @@ import EmergencyOnboardingPage from "./pages/staff/EmergencyOnboardingPage";
 import ModifyBookingPage from "./pages/staff/ModifyBookingPage";
 import ApproveProofPage from "./pages/staff/ApproveProofPage";
 import TodaysSchedule from "./pages/staff/TodaysSchedule";
+import ReportsPage from "./pages/ReportsPage";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -188,6 +189,14 @@ function App() {
         element={
           <ProtectedRoute requiredRole="admin">
             <TodaysSchedule />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/new-report"
+        element={
+          <ProtectedRoute requiredRole="admin">
+            <ReportsPage />
           </ProtectedRoute>
         }
       />

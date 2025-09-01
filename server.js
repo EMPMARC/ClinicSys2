@@ -6,6 +6,7 @@ const bcrypt = require('bcrypt');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const PDFDocument = require('pdfkit');
 const app = express();
 const PORT = 5001;
 
@@ -779,10 +780,9 @@ db.query(sql, (err, results) => {
 app.post('/api/update-por-table-structure', (req, res) => {
   const alterTableSql = `
     ALTER TABLE por_uploads 
-    ADD COLUMN IF NOT EXISTS file_path VARCHAR(255) AFTER file_name,
-    ADD COLUMN IF NOT EXISTS file_size INT AFTER file_path,
-    ADD COLUMN IF NOT EXISTS mimetype VARCHAR(100) AFTER file_size,
-    MODIFY COLUMN file_data LONGBLOB NULL
+    ADD COLUMN file_path VARCHAR(255) AFTER file_name,
+    ADD COLUMN file_size INT AFTER file_path,
+    ADD COLUMN mimetype VARCHAR(100) AFTER file_size
   `;
 
   db.query(alterTableSql, (err, result) => {
@@ -1508,6 +1508,144 @@ app.delete('/api/emergency-report/:id', (req, res) => {
   });
 });
 
+// Report endpoints
+app.get('/report', (req, res) => {
+  res.sendFile(__dirname + '/public/reports.html');
+});
+
+// Generate appointments report (PDF)
+app.post('/api/report1', async (req, res) => {
+  try {
+    const [rows] = await db.promise().execute(
+      `SELECT 
+          m.month,
+          COALESCE(a.total_bookings, 0) AS total_bookings,
+          COALESCE(p.total_emergencies, 0) AS total_emergencies
+       FROM (
+           SELECT DATE_FORMAT(appointment_date,'%M %Y') AS month
+           FROM appointments
+           WHERE appointment_date IS NOT NULL
+           UNION
+           SELECT DATE_FORMAT(date,'%M %Y') AS month
+           FROM emergency_onboarding
+           WHERE date IS NOT NULL
+       ) m
+       LEFT JOIN (
+           SELECT DATE_FORMAT(appointment_date,'%M %Y') AS month,
+                  COUNT(*) AS total_bookings
+           FROM appointments
+           WHERE appointment_date IS NOT NULL
+           GROUP BY DATE_FORMAT(appointment_date,'%M %Y')
+       ) a ON m.month = a.month
+       LEFT JOIN (
+           SELECT DATE_FORMAT(date,'%M %Y') AS month,
+                  COUNT(*) AS total_emergencies
+           FROM emergency_onboarding
+           WHERE date IS NOT NULL
+           GROUP BY DATE_FORMAT(date,'%M %Y')
+       ) p ON m.month = p.month
+       ORDER BY STR_TO_DATE(m.month, '%M %Y')
+       LIMIT 20`
+    );
+
+    // Create PDF
+    const doc = new PDFDocument({ margin: 30, size: "A4" });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=appointment.pdf");
+    doc.pipe(res);
+
+    // Title
+    doc.fontSize(20).text("Appointments Report", { align: "center" });
+    doc.moveDown();
+
+    // Table header
+    doc.fontSize(12).text("Month | Bookings | Emergencies");
+    doc.moveDown(0.5);
+
+    // Loop through results
+    rows.forEach(row => {
+      doc.text(`${row.month} | ${row.total_bookings} | ${row.total_emergencies}`);
+    });
+
+    doc.end();
+
+  } catch (err) {
+    console.error('Error generating appointments report:', err);
+    res.status(500).send("Error generating report: " + err.message);
+  }
+});
+
+// Generate emergency report (PDF)
+app.post('/api/report2', async (req, res) => {
+  try {
+    const [rows] = await db.promise().execute(
+      `SELECT SUM(education_campus) AS Parktown, SUM(other_campus) AS Main, COUNT(*) AS Total
+       FROM emergency_onboarding`
+    );
+
+    const doc = new PDFDocument({ margin: 30, size: "A4" });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=emergency.pdf");
+    doc.pipe(res);
+
+    // Title
+    doc.fontSize(20).text("Emergencies Report", { align: "center" });
+    doc.moveDown();
+
+    // Table header
+    doc.fontSize(12).text("Parktown | Main | Total");
+    doc.moveDown(0.5);
+
+    // Loop through results
+    rows.forEach(row => {
+      doc.text(`${row.Parktown} | ${row.Main} | ${row.Total}`);
+    });
+
+    doc.end();
+
+  } catch (err) {
+    console.error('Error generating emergency report:', err);
+    res.status(500).send("Error generating report: " + err.message);
+  }
+});
+
+// Generate POR report (PDF)
+app.post('/api/report3', async (req, res) => {
+  try {
+    const [rows] = await db.promise().execute(
+      `SELECT 
+          DATE_FORMAT(uploaded_at, '%M %Y') AS month,
+          COUNT(*) AS total_uploads
+       FROM por_uploads
+       GROUP BY DATE_FORMAT(uploaded_at, '%M %Y')
+       ORDER BY STR_TO_DATE(month, '%M %Y')`
+    );
+
+    const doc = new PDFDocument({ margin: 30, size: "A4" });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=POR.pdf");
+    doc.pipe(res);
+
+    // Title
+    doc.fontSize(20).text("Proof of Registration", { align: "center" });
+    doc.moveDown();
+
+    // Table header
+    doc.fontSize(12).text("Date of Upload | Number of uploads");
+    doc.moveDown(0.5);
+
+    // Loop through results
+    rows.forEach(row => {
+      doc.text(`${row.month} | ${row.total_uploads}`);
+    });
+
+    doc.end();
+  } catch (err) {
+    console.error('Error generating POR report:', err);
+    res.status(500).send("Error generating report: " + err.message);
+  }
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Server error:', err);
@@ -1548,4 +1686,8 @@ app.listen(PORT, () => {
   console.log(`- GET /api/emergency-report/:id`);
   console.log(`- PUT /api/emergency-report/:id`);
   console.log(`- DELETE /api/emergency-report/:id`);
+  console.log(`- GET /report (NEW - Reports Dashboard)`);
+  console.log(`- POST /api/report1 (NEW - Appointments PDF Report)`);
+  console.log(`- POST /api/report2 (NEW - Emergency PDF Report)`);
+  console.log(`- POST /api/report3 (NEW - POR PDF Report)`);
 });
