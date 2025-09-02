@@ -7,6 +7,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
+const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 const app = express();
 const PORT = 5001;
 
@@ -35,6 +36,44 @@ db.getConnection((err, connection) => {
   console.log('Connected to MySQL Database!');
   connection.release();
 });
+
+// Chart canvas setup
+const width = 600;
+const height = 400;
+const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height });
+
+// 🔹 Helper function: Draws a clean table
+function drawTable(doc, headers, rows, columnPositions) {
+  const tableTop = doc.y;
+  const rowHeight = 20;
+
+  // Header row
+  doc.font("Helvetica-Bold").fontSize(12);
+  headers.forEach((header, i) => {
+    doc.text(header, columnPositions[i], tableTop);
+  });
+
+  // Line under header
+  doc.moveTo(columnPositions[0], tableTop + 15).lineTo(550, tableTop + 15).stroke();
+
+  // Data rows
+  doc.font("Helvetica").fontSize(11);
+  let y = tableTop + 25;
+
+  rows.forEach(row => {
+    row.forEach((cell, i) => {
+      doc.text(cell.toString(), columnPositions[i], y);
+    });
+
+    // Optional row separator
+    doc.moveTo(columnPositions[0], y + 15).lineTo(550, y + 15)
+       .dash(1, { space: 2 }).stroke().undash();
+
+    y += rowHeight;
+  });
+
+  doc.moveDown();
+}
 
 // Test route
 app.get('/', (req, res) => {
@@ -1513,136 +1552,452 @@ app.get('/report', (req, res) => {
   res.sendFile(__dirname + '/public/reports.html');
 });
 
-// Generate appointments report (PDF)
-app.post('/api/report1', async (req, res) => {
+// 🔹 Report 1: Appointments (Line Chart: Bookings vs Emergencies)
+app.post('/report1', async (req, res) => {
   try {
-    const [rows] = await db.promise().execute(
-      `SELECT 
+    const connection = await db.promise().getConnection();
+
+    const [rows] = await connection.execute(`
+      SELECT 
           m.month,
           COALESCE(a.total_bookings, 0) AS total_bookings,
           COALESCE(p.total_emergencies, 0) AS total_emergencies
-       FROM (
-           SELECT DATE_FORMAT(appointment_date,'%M %Y') AS month
-           FROM appointments
-           WHERE appointment_date IS NOT NULL
-           UNION
-           SELECT DATE_FORMAT(date,'%M %Y') AS month
-           FROM emergency_onboarding
-           WHERE date IS NOT NULL
-       ) m
-       LEFT JOIN (
-           SELECT DATE_FORMAT(appointment_date,'%M %Y') AS month,
-                  COUNT(*) AS total_bookings
-           FROM appointments
-           WHERE appointment_date IS NOT NULL
-           GROUP BY DATE_FORMAT(appointment_date,'%M %Y')
-       ) a ON m.month = a.month
-       LEFT JOIN (
-           SELECT DATE_FORMAT(date,'%M %Y') AS month,
-                  COUNT(*) AS total_emergencies
-           FROM emergency_onboarding
-           WHERE date IS NOT NULL
-           GROUP BY DATE_FORMAT(date,'%M %Y')
-       ) p ON m.month = p.month
-       ORDER BY STR_TO_DATE(m.month, '%M %Y')
-       LIMIT 20`
-    );
+      FROM (
+          SELECT DATE_FORMAT(appointment_date,'%M' ) AS month
+          FROM appointments WHERE appointment_date IS NOT NULL
+          UNION
+          SELECT DATE_FORMAT(date,'%M ') AS month
+          FROM emergency_onboarding WHERE date IS NOT NULL
+      ) m
+      LEFT JOIN (
+          SELECT DATE_FORMAT(appointment_date,'%M ') AS month,
+                 COUNT(*) AS total_bookings
+          FROM appointments
+          WHERE appointment_date IS NOT NULL
+          GROUP BY DATE_FORMAT(appointment_date,'%M ')
+      ) a ON m.month = a.month
+      LEFT JOIN (
+          SELECT DATE_FORMAT(date,'%M ') AS month,
+                 COUNT(*) AS total_emergencies
+          FROM emergency_onboarding
+          WHERE date IS NOT NULL
+          GROUP BY DATE_FORMAT(date,'%M ')
+      ) p ON m.month = p.month
+      ORDER BY STR_TO_DATE(m.month, '%M ')
+    `);
 
-    // Create PDF
+    const labels = rows.map(r => r.month);
+    const bookings = rows.map(r => r.total_bookings);
+    const emergencies = rows.map(r => r.total_emergencies);
+
+    const chartConfig = {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          { label: "Bookings", data: bookings, borderColor: "yellow", backgroundColor: "yellow", fill: false },
+          { label: "Emergencies", data: emergencies, borderColor: "red", backgroundColor: "red", fill: false }
+        ]
+      },
+      options: {
+        scales: {
+          x: { title: { display: true, text: "Month" }, ticks: { autoSkip: true, maxRotation: 0, minRotation: 0 } },
+          y: { title: { display: true, text: "Count" }, beginAtZero: true }
+        }
+      }
+    };
+    const chartImage = await chartJSNodeCanvas.renderToBuffer(chartConfig);
+
+    // PDF
     const doc = new PDFDocument({ margin: 30, size: "A4" });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", "attachment; filename=appointment.pdf");
     doc.pipe(res);
 
-    // Title
     doc.fontSize(20).text("Appointments Report", { align: "center" });
     doc.moveDown();
+    doc.image(chartImage, { fit: [500, 300], align: "center" });
+    doc.moveDown();
 
-    // Table header
-    doc.fontSize(12).text("Month | Bookings | Emergencies");
-    doc.moveDown(0.5);
-
-    // Loop through results
-    rows.forEach(row => {
-      doc.text(`${row.month} | ${row.total_bookings} | ${row.total_emergencies}`);
-    });
+    drawTable(
+      doc,
+      ["Month", "Bookings", "Emergencies"],
+      rows.map(r => [r.month, r.total_bookings, r.total_emergencies]),
+      [50, 250, 400]
+    );
 
     doc.end();
-
+    await connection.release();
   } catch (err) {
-    console.error('Error generating appointments report:', err);
-    res.status(500).send("Error generating report: " + err.message);
+    console.error(err);
+    res.status(500).send("Error generating report1");
   }
 });
 
-// Generate emergency report (PDF)
-app.post('/api/report2', async (req, res) => {
+// 🔹 Report 2: Emergencies (Pie Chart + Table)
+app.post('/report2', async (req, res) => {
   try {
-    const [rows] = await db.promise().execute(
-      `SELECT SUM(education_campus) AS Parktown, SUM(other_campus) AS Main, COUNT(*) AS Total
-       FROM emergency_onboarding`
-    );
+    const connection = await db.promise().getConnection();
+
+    const [rows] = await connection.execute(`
+      SELECT 
+        SUM(education_campus) AS Parktown,
+        SUM(other_campus) AS Main,
+        COUNT(*) AS Total
+      FROM emergency_onboarding
+    `);
+
+    const row = rows[0];
+
+    const chartConfig = {
+      type: "pie",
+      data: {
+        labels: ["Parktown", "Main"],
+        datasets: [{ data: [row.Parktown || 0, row.Main || 0], backgroundColor: ["orange", "green"] }]
+      }
+    };
+    const chartImage = await chartJSNodeCanvas.renderToBuffer(chartConfig);
 
     const doc = new PDFDocument({ margin: 30, size: "A4" });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", "attachment; filename=emergency.pdf");
     doc.pipe(res);
 
-    // Title
     doc.fontSize(20).text("Emergencies Report", { align: "center" });
     doc.moveDown();
+    doc.image(chartImage, { fit: [400, 300], align: "center" });
+    doc.moveDown();
 
-    // Table header
-    doc.fontSize(12).text("Parktown | Main | Total");
-    doc.moveDown(0.5);
-
-    // Loop through results
-    rows.forEach(row => {
-      doc.text(`${row.Parktown} | ${row.Main} | ${row.Total}`);
-    });
+    drawTable(
+      doc,
+      ["Parktown", "Main", "Total"],
+      [[row.Parktown || 0, row.Main || 0, row.Total || 0]],
+      [50, 250, 400]
+    );
 
     doc.end();
-
+    await connection.release();
   } catch (err) {
-    console.error('Error generating emergency report:', err);
-    res.status(500).send("Error generating report: " + err.message);
+    console.error(err);
+    res.status(500).send("Error generating report2");
   }
 });
 
-// Generate POR report (PDF)
-app.post('/api/report3', async (req, res) => {
+// 🔹 Report 3: POR Uploads vs Bookings (Line Chart + Table)
+app.post('/report3', async (req, res) => {
   try {
-    const [rows] = await db.promise().execute(
-      `SELECT 
-          DATE_FORMAT(uploaded_at, '%M %Y') AS month,
-          COUNT(*) AS total_uploads
-       FROM por_uploads
-       GROUP BY DATE_FORMAT(uploaded_at, '%M %Y')
-       ORDER BY STR_TO_DATE(month, '%M %Y')`
-    );
+    const connection = await db.promise().getConnection();
+
+    const [rows] = await connection.execute(`
+      SELECT 
+        m.month,
+        COALESCE(a.total_bookings, 0) AS total_bookings,
+        COALESCE(p.total_uploads, 0) AS total_uploads
+      FROM (
+        SELECT DATE_FORMAT(appointment_date, '%M ') AS month
+        FROM appointments WHERE appointment_date IS NOT NULL
+        UNION
+        SELECT DATE_FORMAT(uploaded_at, '%M ') AS month
+        FROM por_uploads WHERE uploaded_at IS NOT NULL
+      ) m
+      LEFT JOIN (
+        SELECT DATE_FORMAT(appointment_date, '%M ') AS month,
+               COUNT(*) AS total_bookings
+        FROM appointments
+        WHERE appointment_date IS NOT NULL
+        GROUP BY DATE_FORMAT(appointment_date, '%M ')
+      ) a ON m.month = a.month
+      LEFT JOIN (
+        SELECT DATE_FORMAT(uploaded_at, '%M ') AS month,
+               COUNT(*) AS total_uploads
+        FROM por_uploads
+        WHERE uploaded_at IS NOT NULL
+        GROUP BY DATE_FORMAT(uploaded_at, '%M ')
+      ) p ON m.month = p.month
+      ORDER BY STR_TO_DATE(m.month, '%M ')
+    `);
+
+    const labels = rows.map(r => r.month);
+    const uploads = rows.map(r => r.total_uploads);
+    const bookings = rows.map(r => r.total_bookings);
+
+    const chartConfig = {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          { 
+            label: "POR Uploads", 
+            data: uploads, 
+            borderColor: "yellow", 
+            backgroundColor: "yellow", 
+            fill: false 
+          },
+          { 
+            label: "Bookings", 
+            data: bookings, 
+            borderColor: "red", 
+            backgroundColor: "red", 
+            fill: false 
+          }
+        ]
+      },
+      options: {
+        scales: {
+          x: { title: { display: true, text: "Month" }, ticks: { autoSkip: true, maxRotation: 0, minRotation: 0 } },
+          y: { title: { display: true, text: "Count" }, beginAtZero: true }
+        }
+      }
+    };
+    const chartImage = await chartJSNodeCanvas.renderToBuffer(chartConfig);
 
     const doc = new PDFDocument({ margin: 30, size: "A4" });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", "attachment; filename=POR.pdf");
     doc.pipe(res);
 
-    // Title
-    doc.fontSize(20).text("Proof of Registration", { align: "center" });
+    doc.fontSize(20).text("Proof of Registration Uploads vs Bookings", { align: "center" });
+    doc.moveDown();
+    doc.image(chartImage, { fit: [500, 300], align: "center" });
     doc.moveDown();
 
-    // Table header
-    doc.fontSize(12).text("Date of Upload | Number of uploads");
-    doc.moveDown(0.5);
-
-    // Loop through results
-    rows.forEach(row => {
-      doc.text(`${row.month} | ${row.total_uploads}`);
-    });
+    drawTable(
+      doc,
+      ["Month", "POR Uploads", "Bookings"],
+      rows.map(r => [r.month, r.total_uploads, r.total_bookings]),
+      [50, 250, 400]
+    );
 
     doc.end();
+    await connection.release();
   } catch (err) {
-    console.error('Error generating POR report:', err);
-    res.status(500).send("Error generating report: " + err.message);
+    console.error(err);
+    res.status(500).send("Error generating report3");
+  }
+});
+
+// Generate appointments report (PDF) - Updated with charts
+app.post('/api/report1', async (req, res) => {
+  try {
+    const connection = await db.promise().getConnection();
+
+    const [rows] = await connection.execute(`
+      SELECT 
+          m.month,
+          COALESCE(a.total_bookings, 0) AS total_bookings,
+          COALESCE(p.total_emergencies, 0) AS total_emergencies
+      FROM (
+          SELECT DATE_FORMAT(appointment_date,'%M %Y') AS month
+          FROM appointments WHERE appointment_date IS NOT NULL
+          UNION
+          SELECT DATE_FORMAT(date,'%M %Y') AS month
+          FROM emergency_onboarding WHERE date IS NOT NULL
+      ) m
+      LEFT JOIN (
+          SELECT DATE_FORMAT(appointment_date,'%M %Y') AS month,
+                 COUNT(*) AS total_bookings
+          FROM appointments
+          WHERE appointment_date IS NOT NULL
+          GROUP BY DATE_FORMAT(appointment_date,'%M %Y')
+      ) a ON m.month = a.month
+      LEFT JOIN (
+          SELECT DATE_FORMAT(date,'%M %Y') AS month,
+                 COUNT(*) AS total_emergencies
+          FROM emergency_onboarding
+          WHERE date IS NOT NULL
+          GROUP BY DATE_FORMAT(date,'%M %Y')
+      ) p ON m.month = p.month
+      ORDER BY STR_TO_DATE(m.month, '%M %Y')
+      LIMIT 20
+    `);
+
+    const labels = rows.map(r => r.month);
+    const bookings = rows.map(r => r.total_bookings);
+    const emergencies = rows.map(r => r.total_emergencies);
+
+    const chartConfig = {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          { label: "Bookings", data: bookings, borderColor: "yellow", backgroundColor: "yellow", fill: false },
+          { label: "Emergencies", data: emergencies, borderColor: "red", backgroundColor: "red", fill: false }
+        ]
+      },
+      options: {
+        scales: {
+          x: { title: { display: true, text: "Month" }, ticks: { autoSkip: true, maxRotation: 0, minRotation: 0 } },
+          y: { title: { display: true, text: "Count" }, beginAtZero: true }
+        }
+      }
+    };
+    const chartImage = await chartJSNodeCanvas.renderToBuffer(chartConfig);
+
+    // PDF
+    const doc = new PDFDocument({ margin: 30, size: "A4" });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=appointment.pdf");
+    doc.pipe(res);
+
+    doc.fontSize(20).text("Appointments Report", { align: "center" });
+    doc.moveDown();
+    doc.image(chartImage, { fit: [500, 300], align: "center" });
+    doc.moveDown();
+
+    drawTable(
+      doc,
+      ["Month", "Bookings", "Emergencies"],
+      rows.map(r => [r.month, r.total_bookings, r.total_emergencies]),
+      [50, 250, 400]
+    );
+
+    doc.end();
+    await connection.release();
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error generating report1");
+  }
+});
+
+// Generate emergency report (PDF) - Updated with charts
+app.post('/api/report2', async (req, res) => {
+  try {
+    const connection = await db.promise().getConnection();
+
+    const [rows] = await connection.execute(`
+      SELECT 
+        SUM(education_campus) AS Parktown,
+        SUM(other_campus) AS Main,
+        COUNT(*) AS Total
+      FROM emergency_onboarding
+    `);
+
+    const row = rows[0];
+
+    const chartConfig = {
+      type: "pie",
+      data: {
+        labels: ["Parktown", "Main"],
+        datasets: [{ data: [row.Parktown || 0, row.Main || 0], backgroundColor: ["orange", "green"] }]
+      }
+    };
+    const chartImage = await chartJSNodeCanvas.renderToBuffer(chartConfig);
+
+    const doc = new PDFDocument({ margin: 30, size: "A4" });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=emergency.pdf");
+    doc.pipe(res);
+
+    doc.fontSize(20).text("Emergencies Report", { align: "center" });
+    doc.moveDown();
+    doc.image(chartImage, { fit: [400, 300], align: "center" });
+    doc.moveDown();
+
+    drawTable(
+      doc,
+      ["Parktown", "Main", "Total"],
+      [[row.Parktown || 0, row.Main || 0, row.Total || 0]],
+      [50, 250, 400]
+    );
+
+    doc.end();
+    await connection.release();
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error generating report2");
+  }
+});
+
+// Generate POR report (PDF) - Updated with charts
+app.post('/api/report3', async (req, res) => {
+  try {
+    const connection = await db.promise().getConnection();
+
+    const [rows] = await connection.execute(`
+      SELECT 
+        m.month,
+        COALESCE(a.total_bookings, 0) AS total_bookings,
+        COALESCE(p.total_uploads, 0) AS total_uploads
+      FROM (
+        SELECT DATE_FORMAT(appointment_date, '%M %Y') AS month
+        FROM appointments WHERE appointment_date IS NOT NULL
+        UNION
+        SELECT DATE_FORMAT(uploaded_at, '%M %Y') AS month
+        FROM por_uploads WHERE uploaded_at IS NOT NULL
+      ) m
+      LEFT JOIN (
+        SELECT DATE_FORMAT(appointment_date, '%M %Y') AS month,
+               COUNT(*) AS total_bookings
+        FROM appointments
+        WHERE appointment_date IS NOT NULL
+        GROUP BY DATE_FORMAT(appointment_date, '%M %Y')
+      ) a ON m.month = a.month
+      LEFT JOIN (
+        SELECT DATE_FORMAT(uploaded_at, '%M %Y') AS month,
+               COUNT(*) AS total_uploads
+        FROM por_uploads
+        WHERE uploaded_at IS NOT NULL
+        GROUP BY DATE_FORMAT(uploaded_at, '%M %Y')
+      ) p ON m.month = p.month
+      ORDER BY STR_TO_DATE(m.month, '%M %Y')
+    `);
+
+    const labels = rows.map(r => r.month);
+    const uploads = rows.map(r => r.total_uploads);
+    const bookings = rows.map(r => r.total_bookings);
+
+    const chartConfig = {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          { 
+            label: "POR Uploads", 
+            data: uploads, 
+            borderColor: "yellow", 
+            backgroundColor: "yellow", 
+            fill: false 
+          },
+          { 
+            label: "Bookings", 
+            data: bookings, 
+            borderColor: "red", 
+            backgroundColor: "red", 
+            fill: false 
+          }
+        ]
+      },
+      options: {
+        scales: {
+          x: { title: { display: true, text: "Month" }, ticks: { autoSkip: true, maxRotation: 0, minRotation: 0 } },
+          y: { title: { display: true, text: "Count" }, beginAtZero: true }
+        }
+      }
+    };
+    const chartImage = await chartJSNodeCanvas.renderToBuffer(chartConfig);
+
+    const doc = new PDFDocument({ margin: 30, size: "A4" });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=POR.pdf");
+    doc.pipe(res);
+
+    doc.fontSize(20).text("Proof of Registration Uploads vs Bookings", { align: "center" });
+    doc.moveDown();
+    doc.image(chartImage, { fit: [500, 300], align: "center" });
+    doc.moveDown();
+
+    drawTable(
+      doc,
+      ["Month", "POR Uploads", "Bookings"],
+      rows.map(r => [r.month, r.total_uploads, r.total_bookings]),
+      [50, 250, 400]
+    );
+
+    doc.end();
+    await connection.release();
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error generating report3");
   }
 });
 
@@ -1729,8 +2084,11 @@ app.listen(PORT, () => {
   console.log(`- PUT /api/emergency-report/:id`);
   console.log(`- DELETE /api/emergency-report/:id`);
   console.log(`- GET /report (NEW - Reports Dashboard)`);
-  console.log(`- POST /api/report1 (NEW - Appointments PDF Report)`);
-  console.log(`- POST /api/report2 (NEW - Emergency PDF Report)`);
-  console.log(`- POST /api/report3 (NEW - POR PDF Report)`);
+  console.log(`- POST /report1 (NEW - Appointments PDF Report with Charts)`);
+  console.log(`- POST /report2 (NEW - Emergency PDF Report with Charts)`);
+  console.log(`- POST /report3 (NEW - POR PDF Report with Charts)`);
+  console.log(`- POST /api/report1 (UPDATED - Appointments PDF Report with Charts)`);
+  console.log(`- POST /api/report2 (UPDATED - Emergency PDF Report with Charts)`);
+  console.log(`- POST /api/report3 (UPDATED - POR PDF Report with Charts)`);
   console.log(`- GET /api/onboarding-data (NEW - New Registrations Report Data)`);
 });
