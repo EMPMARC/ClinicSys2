@@ -28,7 +28,11 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "server": "node server.js",
+    "dev": "concurrently \"npm run server\" \"npm run start\"",
+    "dev:frontend": "npm run start",
+    "dev:backend": "npm run server"
   },
   "eslintConfig": {
     "extends": [
@@ -60,5 +64,8 @@
   "bugs": {
     "url": "https://github.com/TshiamoMokgethwa/chwc-system/issues"
   },
-  "homepage": "http://."
+  "homepage": "http://.",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
 }
