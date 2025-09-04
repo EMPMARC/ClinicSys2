@@ -1,15 +1,45 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 const ConfirmBooking = () => {
   const { state } = useLocation();
   const navigate = useNavigate();
   const reference = 'CHWCS' + Math.floor(Math.random() * 1000000000);
+  const [porApproved, setPorApproved] = useState(true);
+  const [porChecked, setPorChecked] = useState(false);
+  useEffect(() => {
+    const studentNumber = state?.studentNumber || localStorage.getItem('studentNumber');
+    if (!studentNumber) {
+      setPorApproved(false);
+      setPorChecked(true);
+      return;
+    }
+    const check = async () => {
+      try {
+        const res = await fetch('http://localhost:5001/api/check-por', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studentNumber })
+        });
+        const data = await res.json();
+        setPorApproved(Boolean(data.approved));
+      } catch (e) {
+        setPorApproved(false);
+      } finally {
+        setPorChecked(true);
+      }
+    };
+    check();
+  }, [state]);
   
   // Get data from navigation state
   const { service, date, time, studentNumber } = state || {};
 
   const handleSubmit = async () => {
+    if (!porApproved) {
+      alert('Your proof of registration is not approved yet. You cannot submit a booking.');
+      return;
+    }
     try {
       console.log('Sending appointment data:', {
         referenceNumber: reference,
@@ -87,6 +117,11 @@ const ConfirmBooking = () => {
       <div style={cardStyle}>
         <h2 style={sectionTitleStyle}>Confirm Booking</h2>
         <hr />
+        {!porChecked ? (
+          <p style={errorTextStyle}>Checking approval status...</p>
+        ) : !porApproved ? (
+          <p style={errorTextStyle}>Your proof of registration is not approved yet. Please upload and wait for approval.</p>
+        ) : null}
         
         <div style={infoSectionStyle}>
           <div style={referenceStyle}>

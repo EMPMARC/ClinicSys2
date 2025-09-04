@@ -1,96 +1,116 @@
 import React, { useState } from "react";
 
 const ApproveProofPage = () => {
-  // Temporary mock data (replace with DB/API later)
-  const [submissions, setSubmissions] = useState([
-    {
-      id: 1,
-      name: "John Doe",
-      status: "Pending",
-      fileUrl: "#", // No real file yet
-    },
-    {
-      id: 2,
-      name: "Jane Smith",
-      status: "Pending",
-      fileUrl: "https://example.com/sample-proof.pdf",
-    },
-    {
-      id: 3,
-      name: "Michael Brown",
-      status: "Approved",
-      fileUrl: "https://example.com/sample-proof.pdf",
-    },
-  ]);
+  const [studentNumberInput, setStudentNumberInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [por, setPor] = useState(null); // { id, student_number, file_name, uploaded_at, approval_status }
+  const [decisionLoading, setDecisionLoading] = useState(false);
 
-  const handleApprove = (id) => {
-    setSubmissions((prev) =>
-      prev.map((s) =>
-        s.id === id ? { ...s, status: "Approved" } : s
-      )
-    );
-    // Later: call backend API here
+  const fetchPOR = async () => {
+    setError("");
+    setPor(null);
+    if (!studentNumberInput.trim()) {
+      setError("Please enter a student number");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`http://localhost:5001/api/por/${encodeURIComponent(studentNumberInput.trim())}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "POR not found for this student");
+      }
+      const data = await res.json();
+      setPor(data.por);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleReject = (id) => {
-    setSubmissions((prev) =>
-      prev.map((s) =>
-        s.id === id ? { ...s, status: "Rejected" } : s
-      )
-    );
-    // Later: call backend API here
+  const decide = async (next) => {
+    if (!por) return;
+    setDecisionLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`http://localhost:5001/api/por/${encodeURIComponent(por.student_number)}/decision`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision: next })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to update decision');
+      // Refresh POR to get latest status
+      await fetchPOR();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setDecisionLoading(false);
+    }
   };
 
   return (
     <div style={{ padding: 20 }}>
       <h1>Approve Proof of Registration</h1>
-      <p>Review uploaded proofs and approve or reject them.</p>
+      <p>Search a student's latest uploaded POR, review and approve or reject.</p>
 
-      {submissions.length === 0 ? (
-        <p>No submissions found.</p>
-      ) : (
-        <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 16 }}>
-          <thead>
-            <tr>
-              <th style={{ border: "1px solid #ddd", padding: 8 }}>Student Name</th>
-              <th style={{ border: "1px solid #ddd", padding: 8 }}>Status</th>
-              <th style={{ border: "1px solid #ddd", padding: 8 }}>View Document</th>
-              <th style={{ border: "1px solid #ddd", padding: 8 }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {submissions.map((s) => (
-              <tr key={s.id}>
-                <td style={{ border: "1px solid #ddd", padding: 8 }}>{s.name}</td>
-                <td style={{ border: "1px solid #ddd", padding: 8 }}>{s.status}</td>
-                <td style={{ border: "1px solid #ddd", padding: 8 }}>
-                  {s.fileUrl && s.fileUrl !== "#" ? (
-                    <a href={s.fileUrl} target="_blank" rel="noopener noreferrer">
-                      View Document
-                    </a>
-                  ) : (
-                    <span style={{ color: "#888" }}>No document uploaded</span>
-                  )}
-                </td>
-                <td style={{ border: "1px solid #ddd", padding: 8 }}>
-                  <button
-                    onClick={() => handleApprove(s.id)}
-                    disabled={s.status !== "Pending"}
-                    style={{ marginRight: 8 }}
-                  >
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => handleReject(s.id)}
-                    disabled={s.status !== "Pending"}
-                  >
-                    Reject
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, marginBottom: 12 }}>
+        <input
+          placeholder="Enter student number"
+          value={studentNumberInput}
+          onChange={(e) => setStudentNumberInput(e.target.value)}
+          style={{ padding: 8, border: '1px solid #ccc', borderRadius: 4 }}
+        />
+        <button onClick={fetchPOR} disabled={loading}>
+          {loading ? 'Searching...' : 'Search'}
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ color: '#b00020', marginBottom: 12 }}>{error}</div>
+      )}
+
+      {por && (
+        <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
+          <div style={{ marginBottom: 8 }}>
+            <strong>Student Number:</strong> {por.student_number}
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <strong>File:</strong> {por.file_name}
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <strong>Uploaded:</strong> {new Date(por.uploaded_at).toLocaleString()}
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <strong>Status:</strong> {por.approval_status}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <a
+              href={`http://localhost:5001/api/download-file/${por.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ padding: '8px 12px', border: '1px solid #0b5ed7', borderRadius: 6, color: '#0b5ed7', textDecoration: 'none' }}
+            >
+              View / Download
+            </a>
+            <button
+              onClick={() => decide('approved')}
+              disabled={decisionLoading || por.approval_status === 'approved'}
+              style={{ padding: '8px 12px' }}
+            >
+              Approve
+            </button>
+            <button
+              onClick={() => decide('rejected')}
+              disabled={decisionLoading || por.approval_status === 'rejected'}
+              style={{ padding: '8px 12px' }}
+            >
+              Reject
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

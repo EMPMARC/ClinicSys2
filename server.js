@@ -35,6 +35,8 @@ db.getConnection((err, connection) => {
   }
   console.log('Connected to MySQL Database!');
   connection.release();
+  // Ensure POR uploads table and approval columns exist at startup
+  ensurePorTableExists(() => ensurePorApprovalColumns());
 });
 
 // Chart canvas setup
@@ -101,17 +103,76 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024 // 10MB limit
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|pdf|doc|docx|txt/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-
-    if (mimetype && extname) {
+    const extAllowed = /(\.jpeg|\.jpg|\.png|\.pdf|\.doc|\.docx|\.txt)$/i.test(file.originalname);
+    const mimeAllowed = /^(image\/|application\/pdf|application\/msword|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document|text\/plain)/.test(file.mimetype);
+    if (extAllowed || mimeAllowed) {
       return cb(null, true);
-    } else {
-      cb(new Error('Invalid file type'));
     }
+    cb(new Error('Invalid file type'));
   }
 });
+
+// Ensure POR table has approval columns (compatible with older MySQL)
+function ensurePorApprovalColumns(callback) {
+  const checkSql = `
+    SELECT COLUMN_NAME FROM information_schema.COLUMNS 
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'por_uploads' 
+      AND COLUMN_NAME IN ('approval_status','approved_at')
+  `;
+  db.query(checkSql, (err, results) => {
+    if (err) {
+      console.error('Error checking POR columns:', err);
+      if (typeof callback === 'function') callback();
+      return;
+    }
+    const existing = new Set(results.map(r => r.COLUMN_NAME));
+    const tasks = [];
+    if (!existing.has('approval_status')) {
+      tasks.push(cb => db.query(
+        "ALTER TABLE por_uploads ADD COLUMN approval_status ENUM('pending','approved','rejected') DEFAULT 'pending' AFTER uploaded_at",
+        (e) => { if (e) console.error('Error adding approval_status:', e); cb(); }
+      ));
+    }
+    if (!existing.has('approved_at')) {
+      tasks.push(cb => db.query(
+        "ALTER TABLE por_uploads ADD COLUMN approved_at DATETIME NULL AFTER approval_status",
+        (e) => { if (e) console.error('Error adding approved_at:', e); cb(); }
+      ));
+    }
+    if (tasks.length === 0) {
+      if (typeof callback === 'function') callback();
+      return;
+    }
+    // Run tasks sequentially
+    const runNext = () => {
+      const t = tasks.shift();
+      if (!t) { if (typeof callback === 'function') callback(); return; }
+      t(runNext);
+    };
+    runNext();
+  });
+}
+
+// Ensure POR uploads table exists (idempotent)
+function ensurePorTableExists(callback) {
+  const createSql = `
+    CREATE TABLE IF NOT EXISTS por_uploads (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      student_number VARCHAR(50) NOT NULL,
+      file_name VARCHAR(255) NOT NULL,
+      file_path VARCHAR(255) NULL,
+      file_size INT NULL,
+      mimetype VARCHAR(100) NULL,
+      uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+  db.query(createSql, (err) => {
+    if (err) {
+      console.error('Error ensuring POR table exists:', err);
+    }
+    if (typeof callback === 'function') callback();
+  });
+}
 
 // Helper functions for checking status
 async function checkOnboardingStatus(studentNumber) {
@@ -130,15 +191,17 @@ async function checkOnboardingStatus(studentNumber) {
 
 async function checkPORStatus(studentNumber) {
   return new Promise((resolve) => {
-    const sql = 'SELECT id FROM por_uploads WHERE student_number = ?';
-    db.query(sql, [studentNumber], (err, results) => {
+    const sql = 'SELECT id, approval_status FROM por_uploads WHERE student_number = ?';
+    ensurePorApprovalColumns(() => db.query(sql, [studentNumber], (err, results) => {
       if (err) {
         console.error('Database error checking POR:', err);
-        resolve({ exists: false });
+        resolve({ exists: false, approved: false });
       } else {
-        resolve({ exists: results.length > 0 });
+        const exists = results.length > 0;
+        const approved = exists ? results[0].approval_status === 'approved' : false;
+        resolve({ exists, approved });
       }
-    });
+    }));
   });
 }
 
@@ -228,7 +291,8 @@ app.post('/api/login', async (req, res) => {
           user: studentWithoutPassword,
           userType: 'student',
           onboardingCompleted: onboardingCheck.exists,
-          porUploaded: porCheck.exists
+          porUploaded: porCheck.exists,
+          porApproved: porCheck.approved
         });
       } catch (error) {
         console.error('Error comparing passwords:', error);
@@ -270,18 +334,18 @@ app.post('/api/check-por', (req, res) => {
     return res.status(400).json({ error: 'Student number is required' });
   }
 
-  const sql = 'SELECT id FROM por_uploads WHERE student_number = ?';
+  const sql = 'SELECT id, approval_status FROM por_uploads WHERE student_number = ?';
   
-  db.query(sql, [studentNumber], (err, results) => {
+  ensurePorApprovalColumns(() => db.query(sql, [studentNumber], (err, results) => {
     if (err) {
       console.error('Database error:', err);
       return res.status(500).json({ error: 'Database error', details: err.message });
     }
     
-    res.status(200).json({ 
-      exists: results.length > 0
-    });
-  });
+    const exists = results.length > 0;
+    const approved = exists ? results[0].approval_status === 'approved' : false;
+    res.status(200).json({ exists, approved });
+  }));
 });
 
 // Update your existing upload-por endpoint to use multer
@@ -310,7 +374,7 @@ app.post('/api/upload-por-multer', upload.single('document'), (req, res) => {
    // Check if file already exists for this student
     const checkSql = 'SELECT id FROM por_uploads WHERE student_number = ?';
     
-    db.query(checkSql, [studentNumber], (err, results) => {
+    ensurePorApprovalColumns(() => db.query(checkSql, [studentNumber], (err, results) => {
       if (err) {
         console.error('Database error checking existing records:', err);
         return res.status(500).json({ 
@@ -321,7 +385,7 @@ app.post('/api/upload-por-multer', upload.single('document'), (req, res) => {
       
       if (results.length > 0) {
         // Update existing record
-        const updateSql = 'UPDATE por_uploads SET file_name = ?, file_path = ?, file_size = ?, mimetype = ?, uploaded_at = NOW() WHERE student_number = ?';
+        const updateSql = 'UPDATE por_uploads SET file_name = ?, file_path = ?, file_size = ?, mimetype = ?, uploaded_at = NOW(), approval_status = "pending" WHERE student_number = ?';
         
         db.query(updateSql, [fileData.originalName, fileData.path, fileData.size, fileData.mimetype, studentNumber], (err, result) => {
           if (err) {
@@ -339,7 +403,7 @@ app.post('/api/upload-por-multer', upload.single('document'), (req, res) => {
         });
       } else {
         // Insert new record
-        const insertSql = 'INSERT INTO por_uploads (student_number, file_name, file_path, file_size, mimetype, uploaded_at) VALUES (?, ?, ?, ?, ?, NOW())';
+        const insertSql = 'INSERT INTO por_uploads (student_number, file_name, file_path, file_size, mimetype, uploaded_at, approval_status) VALUES (?, ?, ?, ?, ?, NOW(), "pending")';
         
         db.query(insertSql, [studentNumber, fileData.originalName, fileData.path, fileData.size, fileData.mimetype], (err, result) => {
           if (err) {
@@ -356,10 +420,58 @@ app.post('/api/upload-por-multer', upload.single('document'), (req, res) => {
           });
         });
       }
-    });
+    }));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// Admin: get POR by student number (with latest file info)
+app.get('/api/por/:studentNumber', (req, res) => {
+  const { studentNumber } = req.params;
+  const sql = `
+    SELECT id, student_number, file_name, file_path, file_size, mimetype, uploaded_at, COALESCE(approval_status, 'pending') AS approval_status
+    FROM por_uploads
+    WHERE student_number = ?
+    ORDER BY uploaded_at DESC
+    LIMIT 1
+  `;
+  ensurePorApprovalColumns(() => db.query(sql, [studentNumber], (err, results) => {
+    if (err) {
+      console.error('Database error fetching POR:', err);
+      return res.status(500).json({ error: 'Failed to fetch POR', details: err.message });
+    }
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'No POR found for this student' });
+    }
+    res.status(200).json({ por: results[0] });
+  }));
+});
+
+// Admin: approve/reject POR
+app.post('/api/por/:studentNumber/decision', (req, res) => {
+  const { studentNumber } = req.params;
+  const { decision } = req.body; // 'approved' or 'rejected'
+  if (!['approved', 'rejected'].includes(decision)) {
+    return res.status(400).json({ error: 'Invalid decision' });
+  }
+  const sql = `
+    UPDATE por_uploads
+    SET approval_status = ?, approved_at = CASE WHEN ? = 'approved' THEN NOW() ELSE NULL END
+    WHERE student_number = ?
+    ORDER BY uploaded_at DESC
+    LIMIT 1
+  `;
+  ensurePorApprovalColumns(() => db.query(sql, [decision, decision, studentNumber], (err, result) => {
+    if (err) {
+      console.error('Database error updating POR decision:', err);
+      return res.status(500).json({ error: 'Failed to update POR decision', details: err.message });
+    }
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'No POR record found to update' });
+    }
+    res.status(200).json({ message: `POR ${decision} successfully` });
+  }));
 });
 // Add endpoint to get uploaded files
 app.get('/api/student-files/:studentNumber', (req, res) => {
