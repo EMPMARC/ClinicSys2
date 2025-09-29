@@ -24,6 +24,7 @@
     "recharts": "^3.1.2",
     "web-vitals": "^2.1.4"
   },
+  "homepage": "https://empmarc.github.io/ClinicSys2",
   "scripts": {
      "predeploy": "npm run build",
   "deploy": "gh-pages -b gh-pages -d build",
@@ -66,7 +67,6 @@
   "bugs": {
     "url": "https://github.com/TshiamoMokgethwa/chwc-system/issues"
   },
-  "homepage": "https://empmarc.github.io/ClinicSys",
   "devDependencies": {
     "concurrently": "^9.2.1",
     "gh-pages": "^6.3.0"
