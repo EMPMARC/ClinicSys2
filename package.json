@@ -25,6 +25,8 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
+     "predeploy": "npm run build",
+  "deploy": "gh-pages -b gh-pages -d build",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
@@ -64,8 +66,9 @@
   "bugs": {
     "url": "https://github.com/TshiamoMokgethwa/chwc-system/issues"
   },
-  "homepage": "http://.",
+  "homepage": "https://empmarc.github.io/ClinicSys",
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "gh-pages": "^6.3.0"
   }
 }
