@@ -1,0 +1,16 @@
+{
+  "files": {
+    "main.css": "/ClinicSys2/static/css/main.49f5fc08.css",
+    "main.js": "/ClinicSys2/static/js/main.f30a1419.js",
+    "static/js/453.49e5af61.chunk.js": "/ClinicSys2/static/js/453.49e5af61.chunk.js",
+    "static/media/logo.png": "/ClinicSys2/static/media/logo.c27dee075ba85e88b645.png",
+    "index.html": "/ClinicSys2/index.html",
+    "main.49f5fc08.css.map": "/ClinicSys2/static/css/main.49f5fc08.css.map",
+    "main.f30a1419.js.map": "/ClinicSys2/static/js/main.f30a1419.js.map",
+    "453.49e5af61.chunk.js.map": "/ClinicSys2/static/js/453.49e5af61.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.49f5fc08.css",
+    "static/js/main.f30a1419.js"
+  ]
+}
